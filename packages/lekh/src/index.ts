@@ -1,5 +1,5 @@
 /**
- * The base — `lekh`.
+ * The base — `lekh-editor`.
  *
  * Everything here is pure and runs without a DOM: the editor, the render path,
  * the shipped Validators and the Agent tools. The Canvas and the Text Engine
@@ -173,7 +173,7 @@ export type {
   Point,
 } from "./core/editor/drop-target";
 
-// The render path. No client-only directive anywhere on `lekh`, so a Server
+// The render path. No client-only directive anywhere on `lekh-editor`, so a Server
 // Component can render a stored Document.
 export { renderDocument } from "./core/render/render-document";
 export type { RenderDocumentOptions } from "./core/render/render-document";

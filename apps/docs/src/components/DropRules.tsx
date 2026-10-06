@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { createEditor, defineBlock, type Editor } from "lekh";
+import { createEditor, defineBlock, type Editor } from "lekh-editor";
 
 import { refusalText } from "../examples/nesting-refusal";
 

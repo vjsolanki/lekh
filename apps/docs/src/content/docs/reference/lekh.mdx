@@ -1,5 +1,5 @@
 ---
-title: lekh
+title: lekh-editor
 description: "The editor: create one, define Blocks, and change an email."
 ---
 
@@ -14,12 +14,12 @@ the only thing that changes anything.
 
 It runs anywhere: no DOM, no `node:` builtins. The canvas is a separate import.
 
-![Gzipped size of lekh](https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2Fvjsolanki%2F5d00f9ab6617974fe2b6a95b643ce5b7%2Fraw%2Flekh.json)
+![Gzipped size of lekh-editor](https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2Fvjsolanki%2F5d00f9ab6617974fe2b6a95b643ce5b7%2Fraw%2Flekh-editor.json)
 
 ## Import
 
 ```ts
-import { createEditor, defineBlock } from "lekh";
+import { createEditor, defineBlock } from "lekh-editor";
 ```
 
 ## createEditor
@@ -677,7 +677,7 @@ Your agent can only set a prop it knows the shape of. `describeBlocks` tells it,
 as JSON Schema. Pass it your Block Definitions:
 
 ```ts
-import { describeBlocks } from "lekh";
+import { describeBlocks } from "lekh-editor";
 
 const blocks = describeBlocks(editor.getDefinitions());
 // [{ type: "button", label: "Button", props: { type: "object", ... },
@@ -980,7 +980,7 @@ Ops carry an `origin` so you can tell your own edits apart. Yours default to
 ## Commands
 
 ```ts
-import { createCommands } from "lekh";
+import { createCommands } from "lekh-editor";
 
 const commands = createCommands(editor);
 commands.duplicate();
@@ -1029,7 +1029,7 @@ children. So stepping out of a Block in a column selects the row, and the
 Blocks in a row's columns count as one list, column after column.
 
 No React and no DOM, so it runs anywhere the editor does. Inside React, use
-[`useCommands`](/reference/canvas/#commands) from `lekh/canvas`.
+[`useCommands`](/reference/canvas/#commands) from `lekh-editor/canvas`.
 
 ## Ops
 
@@ -1302,7 +1302,7 @@ spread.
 
 **Size.** `clipCheck`, `ClipCheck`, `ClipCheckOptions`, `GMAIL_CLIP_BYTES`.
 
-The render path, the Validators and the agent tools come from `lekh` too. Each
+The render path, the Validators and the agent tools come from `lekh-editor` too. Each
 has its own page: [Render](/reference/render/),
 [Validators](/reference/validators/) and [Agent tools](/reference/agent/). A send
 job that imports only the render path bundles no editor.

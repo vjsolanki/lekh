@@ -1,5 +1,10 @@
 import { useMemo, useState } from "react";
-import { defineBlock, type EmailDocument, renderDocument, toHtml } from "lekh";
+import {
+  defineBlock,
+  type EmailDocument,
+  renderDocument,
+  toHtml,
+} from "lekh-editor";
 
 /**
  * A tiny set of Block Definitions, written the way a Consumer would write

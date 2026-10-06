@@ -7,7 +7,7 @@
  * shows up once it is let go.
  */
 
-import { SchemaKind, type Block, type BlockDefinition } from "lekh";
+import { SchemaKind, type Block, type BlockDefinition } from "lekh-editor";
 
 /** Hex in three or six digits, or `rgb()`, as an Agent may write one. */
 const COLOR = /^(#[\da-f]{3}([\da-f]{3})?|rgb\([\d\s,.%]+\))$/iu;

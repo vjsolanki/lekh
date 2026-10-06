@@ -1,4 +1,10 @@
-import { SchemaKind, assetOf, defineBlock, isBlank, type Asset } from "lekh";
+import {
+  SchemaKind,
+  assetOf,
+  defineBlock,
+  isBlank,
+  type Asset,
+} from "lekh-editor";
 
 export const image = defineBlock<{ asset: Asset | undefined; width: number }>({
   type: "image",

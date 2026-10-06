@@ -41,7 +41,7 @@ written by hand, and the two mix freely.
 1.  ### Install it
 
     ```sh
-    npm install lekh @react-email/components @tiptap/core @tiptap/pm @tiptap/starter-kit
+    npm install lekh-editor @react-email/components @tiptap/core @tiptap/pm @tiptap/starter-kit
     ```
 
     One package and four optional peers. `@react-email/components` is what the
@@ -72,7 +72,7 @@ written by hand, and the two mix freely.
     const definitions = [...createReactEmailPreset(), myCallout];
     ```
 
-    Read what is in it in [the `lekh/blocks`
+    Read what is in it in [the `lekh-editor/blocks`
     reference](/reference/blocks/). If your users only need a few Blocks,
     [`pickReactEmailPreset`](/reference/blocks/#pickreactemailpreset) ships
     only those.
@@ -80,7 +80,7 @@ written by hand, and the two mix freely.
 3.  ### Create the editor
 
     ```ts
-    import { createEditor } from "lekh";
+    import { createEditor } from "lekh-editor";
     import { definitions, rootType } from "./definitions";
 
     const editor = createEditor({ definitions, rootType });
@@ -101,7 +101,7 @@ written by hand, and the two mix freely.
     re-renders when that changes and not otherwise.
 
     ```tsx
-    import { useEditorState } from "lekh/canvas";
+    import { useEditorState } from "lekh-editor/canvas";
 
     const stage = useEditorState((editor) => editor.getStage());
     ```

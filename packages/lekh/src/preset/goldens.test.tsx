@@ -17,7 +17,7 @@ import { block, documentOf, onMobile, type BlockSpec } from "../testing/tree";
  * the public render path with its doctype, so a file opens in a browser as the
  * email it is. A change to any byte fails here, and the diff is what reaches an
  * inbox. When the change is meant, update them with
- * `pnpm --filter lekh goldens` and commit them on their own, saying why.
+ * `pnpm --filter lekh-editor goldens` and commit them on their own, saying why.
  *
  * They pin today's output, drift included. A golden that looks wrong is fixed
  * by the ticket that fixes the Preset, in its own commit.

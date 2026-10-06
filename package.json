@@ -10,7 +10,7 @@
   "scripts": {
     "docs:dev": "pnpm --filter @lekh/docs dev",
     "build": "pnpm -r build",
-    "size": "pnpm --filter lekh size",
+    "size": "pnpm --filter lekh-editor size",
     "typecheck": "pnpm -r typecheck && tsc -p lint",
     "test": "pnpm -r test",
     "lint": "oxlint",

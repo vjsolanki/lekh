@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { createEditor } from "lekh";
-import { Canvas, EditorProvider } from "lekh/canvas";
-import { createTiptapTextEngine } from "lekh/tiptap";
+import { createEditor } from "lekh-editor";
+import { Canvas, EditorProvider } from "lekh-editor/canvas";
+import { createTiptapTextEngine } from "lekh-editor/tiptap";
 
 import { slots } from "./chrome";
 import { definitions, rootType } from "./definitions";

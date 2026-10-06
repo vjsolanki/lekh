@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import type { CommandName } from "lekh";
-import { defaultKeymap } from "lekh/canvas";
+import type { CommandName } from "lekh-editor";
+import { defaultKeymap } from "lekh-editor/canvas";
 
 import { Button } from "@/components/ui/button";
 import {

@@ -3,7 +3,7 @@ import {
   agentTools,
   type Asset,
   type Editor,
-} from "lekh";
+} from "lekh-editor";
 
 /** Where your image library serves pictures from. */
 const YOUR_IMAGES = "https://images.example.com/";

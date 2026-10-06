@@ -8,8 +8,8 @@
  */
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import type { Suggestion } from "lekh";
-import { useEditorState } from "lekh/canvas";
+import type { Suggestion } from "lekh-editor";
+import { useEditorState } from "lekh-editor/canvas";
 import {
   ArrowPathIcon,
   ArrowRightIcon,

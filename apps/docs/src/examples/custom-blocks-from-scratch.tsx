@@ -1,4 +1,4 @@
-import { defineBlock } from "lekh";
+import { defineBlock } from "lekh-editor";
 
 /**
  * A whole editor's worth of Blocks, owing nothing to any Preset.

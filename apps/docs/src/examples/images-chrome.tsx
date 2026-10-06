@@ -1,4 +1,4 @@
-import type { FailedImageProps, PendingImageProps } from "lekh/canvas";
+import type { FailedImageProps, PendingImageProps } from "lekh-editor/canvas";
 
 const box = ({ rect }: PendingImageProps | FailedImageProps) => ({
   position: "absolute" as const,

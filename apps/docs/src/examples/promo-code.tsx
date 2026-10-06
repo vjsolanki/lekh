@@ -1,4 +1,4 @@
-import { defineBlock } from "lekh";
+import { defineBlock } from "lekh-editor";
 
 // A type alias rather than an interface: an interface has no implicit index
 // signature, so it does not satisfy the `Record<string, unknown>` constraint.

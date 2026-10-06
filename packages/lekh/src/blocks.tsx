@@ -1,5 +1,5 @@
 /**
- * The shipped Blocks — `lekh/blocks`.
+ * The shipped Blocks — `lekh-editor/blocks`.
  *
  * Two Presets: the everyday Blocks, and the compliance Blocks (unsubscribe and
  * postal address). The only entry point that imports react.email, and the core

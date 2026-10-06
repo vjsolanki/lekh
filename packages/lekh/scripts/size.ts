@@ -11,7 +11,7 @@ import budgets from "../size-budget.json" with { type: "json" };
 // `own` is lekh's own code with every package left external: what the library
 // itself weighs. `shipped` folds in the runtime dependencies a Consumer never
 // asked for and cannot drop — today only @dnd-kit, reached through
-// lekh/canvas — while still leaving the peer dependencies out, because React
+// lekh-editor/canvas — while still leaving the peer dependencies out, because React
 // is already in the bundle and react.email and Tiptap are the Consumer's own
 // choice. Only `shipped` is held to a budget: it is the bill.
 //
@@ -79,7 +79,8 @@ type Entry = {
 const entryPoints: readonly Entry[] = Object.entries(manifest.exports).flatMap(
   ([subpath, target]) => {
     if (subpath === "./package.json" || typeof target === "string") return [];
-    const name = subpath === "." ? "lekh" : `lekh/${subpath.slice(2)}`;
+    const name =
+      subpath === "." ? manifest.name : `${manifest.name}/${subpath.slice(2)}`;
     return [{ name, file: join(packageRoot, target.default) }];
   },
 );
@@ -90,20 +91,20 @@ const entryPoints: readonly Entry[] = Object.entries(manifest.exports).flatMap(
 //
 // What a Consumer saves by picking Blocks rather than taking them all: a
 // typical short list. And a send pipeline, which imports the render path from
-// `lekh` and must not bundle the editor that sits beside it (ADR-0045).
+// `lekh-editor` and must not bundle the editor that sits beside it (ADR-0045).
 const blocksFile = join(packageRoot, manifest.exports["./blocks"].default);
 const baseFile = join(packageRoot, manifest.exports["."].default);
 const picked = ["headingBlock", "textBlock", "imageBlock", "buttonBlock"];
 const scenarios: readonly Entry[] = [
   {
-    name: "lekh/blocks, four Blocks picked",
+    name: `${manifest.name}/blocks, four Blocks picked`,
     file: blocksFile,
     source:
       `import { pickReactEmailPreset, ${picked.join(", ")} } from ${JSON.stringify(blocksFile)};\n` +
       `export default pickReactEmailPreset([${picked.join(", ")}]);\n`,
   },
   {
-    name: "lekh, the render path alone",
+    name: `${manifest.name}, the render path alone`,
     file: baseFile,
     source: `export { renderDocument, toHtml } from ${JSON.stringify(baseFile)};\n`,
   },
@@ -288,7 +289,7 @@ const previous = readBaseline(values.baseline);
 const missing = entryPoints.filter((entry) => !existsSync(entry.file));
 if (missing.length > 0) {
   console.error(
-    `dist/ is missing ${missing.map((entry) => entry.name).join(", ")}. Run \`pnpm --filter lekh build\` first.`,
+    `dist/ is missing ${missing.map((entry) => entry.name).join(", ")}. Run \`pnpm --filter lekh-editor build\` first.`,
   );
   process.exit(1);
 }

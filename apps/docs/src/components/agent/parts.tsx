@@ -4,7 +4,7 @@
  */
 
 import { createContext, useContext, type ReactNode } from "react";
-import type { Edit, Editor, Suggestion } from "lekh";
+import type { Edit, Editor, Suggestion } from "lekh-editor";
 
 import { cn } from "@/lib/utils";
 

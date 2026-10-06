@@ -13,7 +13,7 @@ import { LinkCard } from "@astrojs/starlight/components";
 
 The palette, the outline, the inspector, the top bar, every outline and toolbar
 drawn over the email, and the dialog that answers the image hook are all
-ordinary application code. `lekh` supplies the Document, the editing mechanics,
+ordinary application code. `lekh-editor` supplies the Document, the editing mechanics,
 the drag geometry and the path to markup. It draws none of it.
 
 The editor opens on a release-notes email that uses every Block both shipped
@@ -75,7 +75,7 @@ each one.
   as it would be sent. Export downloads the HTML or the Document's JSON.
 - **Watch the size.** The status bar shows how big the HTML is against Gmail's
   clip, which hides anything past roughly 102 KB. It turns amber when the email
-  gets close. `clipCheck` from [`lekh`](/reference/render/#clipcheck)
+  gets close. `clipCheck` from [`lekh-editor`](/reference/render/#clipcheck)
   does the counting.
 - **Look at it in dark mode.** The **Dark** menu shows the email under no
   change, partial invert or full invert, or all three side by side. The sample's
@@ -93,7 +93,7 @@ Preview.
   change as it happens. See
   [Save and load a document](/guides/save-and-load/#saving-as-somebody-works).
 - **Send test.** Send the Document to your server. Render it there with
-  `renderDocument` from `lekh`, run `clipCheck` on the final HTML, and hand it to your email
+  `renderDocument` from `lekh-editor`, run `clipCheck` on the final HTML, and hand it to your email
   provider. See [Render an email on a server](/guides/server-rendering/).
 
 The email's name in the top bar is yours too. It is not part of the Document,

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, type ReactNode } from "react";
-import type { ControlDescriptor, Editor, Suggestion } from "lekh";
-import { useEditorState } from "lekh/canvas";
+import type { ControlDescriptor, Editor, Suggestion } from "lekh-editor";
+import { useEditorState } from "lekh-editor/canvas";
 import { CheckIcon, EyeIcon } from "@heroicons/react/24/outline";
 
 import { Button } from "@/components/ui/button";

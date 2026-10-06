@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import type { ControlDescriptor, Diagnostic, Editor } from "lekh";
-import { useEditorState } from "lekh/canvas";
+import type { ControlDescriptor, Diagnostic, Editor } from "lekh-editor";
+import { useEditorState } from "lekh-editor/canvas";
 
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";

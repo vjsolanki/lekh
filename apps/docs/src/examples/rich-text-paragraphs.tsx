@@ -1,4 +1,4 @@
-import { defineBlock, RichText } from "lekh";
+import { defineBlock, RichText } from "lekh-editor";
 
 /** Body copy that holds paragraphs, spaced by a prop of its own. */
 export const bodyCopy = defineBlock<{ content: string; spacing: number }>({

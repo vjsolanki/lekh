@@ -1,11 +1,11 @@
-import { createEditor } from "lekh";
+import { createEditor } from "lekh-editor";
 import {
   buttonBlock,
   imageBlock,
   pickReactEmailPreset,
   REACT_EMAIL_ROOT_TYPE,
   textBlock,
-} from "lekh/blocks";
+} from "lekh-editor/blocks";
 
 // Only these three, plus `email` and `section`, reach your bundle.
 const definitions = pickReactEmailPreset([textBlock, imageBlock, buttonBlock], {

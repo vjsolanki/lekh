@@ -142,14 +142,14 @@ same rule that drops the link from the email. Its Repair unsets the prop too.
 
 The three `html` ones run on every prop of the
 `html` kind. The rest depend on what you composed in. The Preset's own codes
-are on `PresetDiagnostic`. See [lekh/blocks](/reference/blocks/#diagnostic-codes).
+are on `PresetDiagnostic`. See [lekh-editor/blocks](/reference/blocks/#diagnostic-codes).
 
 ## Optional checks
 
 Three ship, and none runs unless you ask:
 
 ```ts
-import { minimumContrast, minimumFontSize, workingLinks } from "lekh";
+import { minimumContrast, minimumFontSize, workingLinks } from "lekh-editor";
 
 createEditor({
   definitions,

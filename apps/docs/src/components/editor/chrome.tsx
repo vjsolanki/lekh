@@ -17,7 +17,7 @@ import {
   type DropTarget,
   type Editor,
   type ImagePlacement,
-} from "lekh";
+} from "lekh-editor";
 import {
   useBlockDrag,
   useCommands,
@@ -35,7 +35,7 @@ import {
   type PendingImageProps,
   type Rect,
   type TextToolbarProps,
-} from "lekh/canvas";
+} from "lekh-editor/canvas";
 
 import { Button } from "@/components/ui/button";
 import {

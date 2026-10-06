@@ -4,8 +4,8 @@ import {
   renderDocument,
   toHtml,
   UnknownBlockError,
-} from "lekh";
-import { createReactEmailPreset } from "lekh/blocks";
+} from "lekh-editor";
+import { createReactEmailPreset } from "lekh-editor/blocks";
 
 const definitions = createReactEmailPreset();
 

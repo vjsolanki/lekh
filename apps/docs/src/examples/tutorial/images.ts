@@ -1,4 +1,4 @@
-import type { Asset, ImageResolver } from "lekh";
+import type { Asset, ImageResolver } from "lekh-editor";
 
 /**
  * Measure an image the browser can already fetch.

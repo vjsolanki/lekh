@@ -1,5 +1,5 @@
-import { createEditor } from "lekh";
-import { createReactEmailPreset } from "lekh/blocks";
+import { createEditor } from "lekh-editor";
+import { createReactEmailPreset } from "lekh-editor/blocks";
 
 import {
   createHouseFooterPreset,

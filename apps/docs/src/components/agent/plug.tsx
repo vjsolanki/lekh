@@ -9,7 +9,7 @@
  * Every change the agent makes arrives as a Suggestion. It waits while your
  * users work elsewhere, and is accepted whole as one undo step or rejected
  * leaving nothing. The agent is scripted, so the page needs no model and no
- * key, but it reads and suggests through the same agent tools from `lekh` a model
+ * key, but it reads and suggests through the same agent tools from `lekh-editor` a model
  * would.
  */
 
@@ -20,7 +20,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { Editor } from "lekh";
+import type { Editor } from "lekh-editor";
 
 import EmailEditor, { type AgentPart } from "@/components/editor/EmailEditor";
 import {

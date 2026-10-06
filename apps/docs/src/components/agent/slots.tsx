@@ -12,7 +12,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
-import type { Block, Suggestion } from "lekh";
+import type { Block, Suggestion } from "lekh-editor";
 import {
   useEditor,
   useEditorState,
@@ -21,7 +21,7 @@ import {
   type Rect,
   type SuggestionChromeProps,
   type TouchedBlock,
-} from "lekh/canvas";
+} from "lekh-editor/canvas";
 import {
   ArrowPathIcon,
   ChatBubbleOvalLeftIcon,

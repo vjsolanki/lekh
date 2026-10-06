@@ -6,7 +6,7 @@
  * the words your users typed. What it sends to `suggest` has the same shape.
  */
 
-import type { Block, Edit, EmailDocument, EmailReading } from "lekh";
+import type { Block, Edit, EmailDocument, EmailReading } from "lekh-editor";
 
 /** What the agent decided: Edits to suggest, or only words. */
 export type Plan =

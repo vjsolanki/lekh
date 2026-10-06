@@ -2,7 +2,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { MoonIcon, SunIcon } from "@heroicons/react/20/solid";
 
-const INSTALL = "npm install lekh";
+const INSTALL = "npm install lekh-editor";
 
 /**
  * Starlight's key, so the front page and the docs wear the same theme. The

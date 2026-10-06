@@ -22,8 +22,8 @@ import {
   type Origin,
   type PendingChange,
   brandColorsOf,
-} from "lekh";
-import { useEditor, useEditorState } from "lekh/canvas";
+} from "lekh-editor";
+import { useEditor, useEditorState } from "lekh-editor/canvas";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";

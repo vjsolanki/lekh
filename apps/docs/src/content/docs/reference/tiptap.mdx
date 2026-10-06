@@ -1,5 +1,5 @@
 ---
-title: lekh/tiptap
+title: lekh-editor/tiptap
 description: "The text engine that ships, built on Tiptap."
 ---
 
@@ -17,12 +17,12 @@ release pace. Read it before you rely on it, and be ready to write your own
 exists, so that is a supported path rather than a fork.
 :::
 
-![Gzipped size of lekh/tiptap](https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2Fvjsolanki%2F5d00f9ab6617974fe2b6a95b643ce5b7%2Fraw%2Flekh-tiptap.json)
+![Gzipped size of lekh-editor/tiptap](https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2Fvjsolanki%2F5d00f9ab6617974fe2b6a95b643ce5b7%2Fraw%2Flekh-editor-tiptap.json)
 
 ## Import
 
 ```ts
-import { createTiptapTextEngine } from "lekh/tiptap";
+import { createTiptapTextEngine } from "lekh-editor/tiptap";
 ```
 
 `@tiptap/core`, `@tiptap/pm` and `@tiptap/starter-kit` are optional peer
@@ -113,7 +113,7 @@ function MyToolbar({ rect, formatting, commands }: TextToolbarProps) {
 `rect` is already translated into the canvas's coordinate space, so there is no
 arithmetic to do. `formatting` says what the current selection carries;
 `commands` changes it. Both types live in
-[`lekh/canvas`](/reference/canvas/).
+[`lekh-editor/canvas`](/reference/canvas/).
 
 ## Everything this entry point exports
 
@@ -126,4 +126,4 @@ Three names, and nothing else:
 Implement `TextEngine` and `EditableText` yourself and pass those instead.
 
 Nothing in the core knows Tiptap exists, so this is a supported path, not a
-fork. The types come from [`lekh`](/reference/lekh/).
+fork. The types come from [`lekh-editor`](/reference/lekh/).

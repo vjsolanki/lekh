@@ -29,7 +29,7 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       # The measurement bundles dist/, so the build has to have happened.
-      - run: pnpm --filter lekh build
+      - run: pnpm --filter lekh-editor build
 
       # The baseline is the base commit, built and measured here: the pull
       # request's base, or the previous tip of main on a push. Nothing is
@@ -48,8 +48,8 @@ jobs:
           git worktree add -q "$RUNNER_TEMP/base" FETCH_HEAD
           cd "$RUNNER_TEMP/base"
           pnpm install --frozen-lockfile
-          pnpm --filter lekh build
-          pnpm --silent --filter lekh size \
+          pnpm --filter lekh-editor build
+          pnpm --silent --filter lekh-editor size \
             --report "$RUNNER_TEMP/baseline.json" > /dev/null \
             || echo '{}' > "$RUNNER_TEMP/baseline.json"
 
@@ -58,7 +58,7 @@ jobs:
           {
             echo '## Bundle size'
             echo
-            pnpm --silent --filter lekh size --markdown \
+            pnpm --silent --filter lekh-editor size --markdown \
               --baseline "$RUNNER_TEMP/baseline.json"
             echo
             echo 'Gzipped, peer dependencies excluded. Change is against the base commit.'
@@ -118,7 +118,7 @@ jobs:
               >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
-          pnpm --silent --filter lekh size \
+          pnpm --silent --filter lekh-editor size \
             --gist-payload "$RUNNER_TEMP/gist.json" > /dev/null
           if ! gh api --method PATCH "gists/${GIST_ID}" \
             --input "$RUNNER_TEMP/gist.json" --silent; then
@@ -129,4 +129,4 @@ jobs:
 
       # Last, so the badges and the comment exist even when this fails.
       - name: Check the budgets
-        run: pnpm --silent --filter lekh size --check
+        run: pnpm --silent --filter lekh-editor size --check

@@ -1,6 +1,6 @@
 import { useRef } from "react";
 import { Slider } from "radix-ui";
-import type { ControlDescriptor } from "lekh";
+import type { ControlDescriptor } from "lekh-editor";
 import { useShownValue } from "./shown-value";
 
 /**

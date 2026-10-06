@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { defineBlock, NONE, SchemaKind, type Block } from "lekh";
+import { defineBlock, NONE, SchemaKind, type Block } from "lekh-editor";
 
 import { colorsInEmail } from "./swatches";
 

@@ -1,5 +1,5 @@
-import { SchemaKind, NONE, assetOf, type ControlDescriptor } from "lekh";
-import { useEditor, useEditorState } from "lekh/canvas";
+import { SchemaKind, NONE, assetOf, type ControlDescriptor } from "lekh-editor";
+import { useEditor, useEditorState } from "lekh-editor/canvas";
 
 /**
  * `control.value` is `unknown`, because your Blocks decide what a prop holds.

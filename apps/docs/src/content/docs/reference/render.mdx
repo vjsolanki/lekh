@@ -11,14 +11,14 @@ import clip from "../../../examples/clip-check.ts?raw";
 
 Turns a Document, the JSON tree that holds an email, into HTML.
 
-Everything on this page comes from `lekh`. Import only these in a send job or
+Everything on this page comes from `lekh-editor`. Import only these in a send job or
 a Server Component, and your bundler leaves the editor out.
 [Render an email on a server](/guides/server-rendering/) has the details.
 
 ## Import
 
 ```ts
-import { renderDocument, toHtml } from "lekh";
+import { renderDocument, toHtml } from "lekh-editor";
 ```
 
 <Code code={basic} lang="tsx" title="render-to-html.tsx" />
@@ -125,7 +125,7 @@ say how big the sent email will be.
 | `risk`   | `"ok"` \| `"near"` \| `"clipped"` | `near` once it is inside the headroom, `clipped` past `limit`. |
 
 `GMAIL_CLIP_BYTES` is the default limit, 102 × 1024 bytes. `clipCheck` is on
-[`lekh`](/reference/lekh/) too, so an editor can show the size as people work.
+[`lekh-editor`](/reference/lekh/) too, so an editor can show the size as people work.
 
 ## Errors
 

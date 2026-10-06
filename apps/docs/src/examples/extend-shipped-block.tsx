@@ -3,8 +3,8 @@ import {
   classNames,
   type BlockDefinition,
   type SchemaEntry,
-} from "lekh";
-import { createReactEmailPreset } from "lekh/blocks";
+} from "lekh-editor";
+import { createReactEmailPreset } from "lekh-editor/blocks";
 
 const preset = createReactEmailPreset();
 

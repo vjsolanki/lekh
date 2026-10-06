@@ -1,4 +1,7 @@
-import { createReactEmailPreset, type ReactEmailIcon } from "lekh/blocks";
+import {
+  createReactEmailPreset,
+  type ReactEmailIcon,
+} from "lekh-editor/blocks";
 
 /**
  * Your social links, offered in every icon row.

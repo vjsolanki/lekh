@@ -1,4 +1,4 @@
-import type { Editor, EmailDocument, Op } from "lekh";
+import type { Editor, EmailDocument, Op } from "lekh-editor";
 
 /**
  * Save one small patch per change instead of the whole email.

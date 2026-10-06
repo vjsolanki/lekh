@@ -1,5 +1,5 @@
 ---
-title: lekh/blocks
+title: lekh-editor/blocks
 description: "The built-in Blocks, ready to compose into an editor."
 ---
 
@@ -7,7 +7,7 @@ import { Code } from "@astrojs/starlight/components";
 import extend from "../../../examples/extend-shipped-block.tsx?raw";
 import socialIcons from "../../../examples/social-icons.ts?raw";
 import pickBlocks from "../../../examples/pick-blocks.ts?raw";
-import { createReactEmailPreset } from "lekh/blocks";
+import { createReactEmailPreset } from "lekh-editor/blocks";
 import BlockReference from "../../../components/BlockReference.astro";
 
 Fifteen Block Definitions covering an ordinary marketing email, built on
@@ -21,12 +21,15 @@ Preset. See [Compliance Blocks](/reference/compliance/).
 The core imports nothing from react.email. If you target MJML or your own
 component set, never import this and none of it reaches your bundle.
 
-![Gzipped size of lekh/blocks](https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2Fvjsolanki%2F5d00f9ab6617974fe2b6a95b643ce5b7%2Fraw%2Flekh-blocks.json)
+![Gzipped size of lekh-editor/blocks](https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2Fvjsolanki%2F5d00f9ab6617974fe2b6a95b643ce5b7%2Fraw%2Flekh-editor-blocks.json)
 
 ## Import
 
 ```ts
-import { createReactEmailPreset, REACT_EMAIL_ROOT_TYPE } from "lekh/blocks";
+import {
+  createReactEmailPreset,
+  REACT_EMAIL_ROOT_TYPE,
+} from "lekh-editor/blocks";
 
 const definitions = createReactEmailPreset({ fontFamily: "Inter, sans-serif" });
 const editor = createEditor({ definitions, rootType: REACT_EMAIL_ROOT_TYPE });
@@ -623,7 +626,7 @@ Every `align` stores `start`, `center` or `end`, and the email writes the real
 side. See [Alignment](#alignment).
 
 `heading` and `text` hold rich text, so they need a Text Engine before anybody
-can type into them. See [lekh/tiptap](/reference/tiptap/).
+can type into them. See [lekh-editor/tiptap](/reference/tiptap/).
 
 `text` holds paragraphs. Return starts one and Shift+Return breaks the line. A
 `heading` stays one line, so Return breaks the line there.
@@ -990,7 +993,7 @@ The Blocks for `pickReactEmailPreset`: `columnsBlock`, `headingBlock`,
 `textBlock`, `imageBlock`, `buttonBlock`, `dividerBlock`, `spacerBlock`,
 `htmlBlock`, `iconRowBlock`, `navBlock`
 
-`defineBlock`, `RichText` and the rest come from [`lekh`](/reference/lekh/).
+`defineBlock`, `RichText` and the rest come from [`lekh-editor`](/reference/lekh/).
 
 ## Why it works this way
 

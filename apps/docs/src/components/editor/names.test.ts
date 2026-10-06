@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createEditor } from "lekh";
+import { createEditor } from "lekh-editor";
 
 import { containerName, containerPath, isWhereItIs, placeName } from "./names";
 import {

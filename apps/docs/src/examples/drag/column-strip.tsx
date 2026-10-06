@@ -3,7 +3,7 @@ import {
   useState,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import { useEditorState } from "lekh/canvas";
+import { useEditorState } from "lekh-editor/canvas";
 
 /**
  * A strip above the selected row, one segment per column, with a grip on the

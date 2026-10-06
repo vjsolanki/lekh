@@ -1,4 +1,4 @@
-import type { Block, ValidationContext } from "lekh";
+import type { Block, ValidationContext } from "lekh-editor";
 
 /**
  * What a prop actually says, for a check that has to judge it.

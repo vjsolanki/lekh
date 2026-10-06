@@ -6,15 +6,18 @@ import {
   type Editor,
   type EmailDocument,
   type SuggestionJSON,
-} from "lekh";
+} from "lekh-editor";
 import {
   Canvas,
   EditorProvider,
   useEditorState,
   type BlockChromeProps,
-} from "lekh/canvas";
-import { createReactEmailPreset } from "lekh/blocks";
-import { createTiptapTextEngine, type TiptapTextEngine } from "lekh/tiptap";
+} from "lekh-editor/canvas";
+import { createReactEmailPreset } from "lekh-editor/blocks";
+import {
+  createTiptapTextEngine,
+  type TiptapTextEngine,
+} from "lekh-editor/tiptap";
 
 // The Slot from "Add an agent to your editor": an outline, Accept and Reject.
 import { SuggestionMark } from "./suggestion-slot";

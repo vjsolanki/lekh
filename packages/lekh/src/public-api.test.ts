@@ -15,7 +15,7 @@ import { describe, expect, it } from "vitest";
  *     the pages and names what is missing.
  *
  * The second exists because the first is only a reminder, and reminders lose.
- * Twenty-four names on `lekh` and twenty-six on what was then `lekh/render`
+ * Twenty-four names on `lekh-editor` and twenty-six on what was then `lekh/render`
  * had drifted out of the pages before it was written.
  *
  * When the snapshot fails, the fix is two steps, in this order:
@@ -38,7 +38,7 @@ interface EntryPoint {
    * The Reference pages documenting it.
    *
    * Pages are by topic, not by import path, so one entry point may span
-   * several: `lekh` carries the editor, the render path, the Validators and
+   * several: `lekh-editor` carries the editor, the render path, the Validators and
    * the Agent tools, and each has a page of its own.
    */
   readonly pages: readonly string[];
@@ -47,16 +47,16 @@ interface EntryPoint {
 const ENTRY_POINTS: readonly EntryPoint[] = [
   {
     name: "index",
-    importPath: "lekh",
+    importPath: "lekh-editor",
     pages: ["lekh", "render", "validators", "agent"],
   },
-  { name: "canvas", importPath: "lekh/canvas", pages: ["canvas"] },
+  { name: "canvas", importPath: "lekh-editor/canvas", pages: ["canvas"] },
   {
     name: "blocks",
-    importPath: "lekh/blocks",
+    importPath: "lekh-editor/blocks",
     pages: ["blocks", "compliance"],
   },
-  { name: "tiptap", importPath: "lekh/tiptap", pages: ["tiptap"] },
+  { name: "tiptap", importPath: "lekh-editor/tiptap", pages: ["tiptap"] },
 ];
 
 const referencePagesOf = (entry: EntryPoint): string =>
@@ -82,7 +82,7 @@ const declarationOf = (entry: string): string => {
     return readFileSync(path, "utf8");
   } catch {
     throw new Error(
-      `${path} is missing. This test reads the built declarations — run \`pnpm --filter lekh build\` first.`,
+      `${path} is missing. This test reads the built declarations — run \`pnpm --filter lekh-editor build\` first.`,
     );
   }
 };
@@ -158,7 +158,7 @@ describe("public API", () => {
   // A Slot is a name a Consumer writes as a key, so dropping one breaks them
   // as surely as dropping an export — and the export list cannot see it,
   // because `CanvasSlots` itself is still there.
-  it("lekh/canvas offers a pinned set of Slots", () => {
+  it("lekh-editor/canvas offers a pinned set of Slots", () => {
     const body = /interface CanvasSlots \{([\s\S]*?)\n\}/u.exec(
       declarationOf("canvas"),
     )?.[1];
@@ -222,7 +222,9 @@ describe("public API", () => {
     const declared = Object.keys(exported)
       .filter((path) => path !== "./package.json")
       .map((path) =>
-        path.replace(/^\.\/?/u, "lekh/").replace(/^lekh\/$/u, "lekh"),
+        path
+          .replace(/^\.\/?/u, "lekh-editor/")
+          .replace(/^lekh-editor\/$/u, "lekh-editor"),
       )
       .toSorted((a, b) => a.localeCompare(b));
 

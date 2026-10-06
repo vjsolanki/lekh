@@ -1,4 +1,4 @@
-import { SchemaKind, type ControlDescriptor } from "lekh";
+import { SchemaKind, type ControlDescriptor } from "lekh-editor";
 
 import { boxLabel, choicesOf } from "./labels";
 

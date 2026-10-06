@@ -13,7 +13,7 @@ provider sends.
 
 ## The short version
 
-Import `renderDocument` and `toHtml` from `lekh`. Your bundler tree-shakes the
+Import `renderDocument` and `toHtml` from `lekh-editor`. Your bundler tree-shakes the
 rest, so no editor reaches your server bundle.
 
 <Code code={send} lang="ts" title="server-send.ts" />
@@ -21,26 +21,26 @@ rest, so no editor reaches your server bundle.
 Works in a route handler, a Server Component, a queue worker, a cron job or an
 edge function. It touches no `node:` builtins and no DOM.
 
-## Import from `lekh`, not `lekh/canvas`
+## Import from `lekh-editor`, not `lekh-editor/canvas`
 
-`lekh` carries no client-only directive and contains no canvas, no
-drag-and-drop and no Tiptap. Those live in `lekh/canvas` and `lekh/tiptap`.
+`lekh-editor` carries no client-only directive and contains no canvas, no
+drag-and-drop and no Tiptap. Those live in `lekh-editor/canvas` and `lekh-editor/tiptap`.
 
-`lekh` has no side effects, so your bundler keeps only the names you import. A
+`lekh-editor` has no side effects, so your bundler keeps only the names you import. A
 send job that imports `renderDocument` and `toHtml` ships the render path, not
 the editor.
 
-Everything needed to _write_ a Block Definition comes from `lekh` too:
+Everything needed to _write_ a Block Definition comes from `lekh-editor` too:
 `defineBlock`, `RichText`, `classNames`, `MobileStyles` and `assetOf`. Your
 Blocks can live in a file that both your editor and your send job import.
 
 ```ts
 // blocks.ts — imported by both sides
-import { defineBlock, RichText } from "lekh";
+import { defineBlock, RichText } from "lekh-editor";
 ```
 
-With no bundler, Node loads the whole `lekh` module. That still runs on a
-server, because `lekh` is pure.
+With no bundler, Node loads the whole `lekh-editor` module. That still runs on a
+server, because `lekh-editor` is pure.
 
 ## Two steps, on purpose
 
@@ -122,9 +122,9 @@ export default async function Preview({ id }: { id: string }) {
 }
 ```
 
-The canvas is not. Anything importing `lekh/canvas` needs `"use client"`.
+The canvas is not. Anything importing `lekh-editor/canvas` needs `"use client"`.
 
-Keep Block Definitions in their own file that imports only from `lekh`. Then
+Keep Block Definitions in their own file that imports only from `lekh-editor`. Then
 both sides can share them without dragging the canvas across the line.
 
 ## In depth
@@ -176,12 +176,12 @@ fail.
 
 ## Common problems
 
-**"document is not defined" on the server.** Something imported `lekh/canvas`.
-Check your Block Definitions import from `lekh`, not `lekh/canvas`.
+**"document is not defined" on the server.** Something imported `lekh-editor/canvas`.
+Check your Block Definitions import from `lekh-editor`, not `lekh-editor/canvas`.
 
 **The editor ends up in your server bundle.** Check your bundler tree-shakes
-for the server build. Then check nothing on that side imports `lekh/canvas`
-or `lekh/tiptap`.
+for the server build. Then check nothing on that side imports `lekh-editor/canvas`
+or `lekh-editor/tiptap`.
 
 **The email renders but looks unstyled in Gmail.** Gmail strips stylesheets.
 Everything must be inline styles or the mobile stylesheet the root emits.

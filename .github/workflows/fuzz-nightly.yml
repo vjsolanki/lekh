@@ -33,7 +33,7 @@ jobs:
           NO_COLOR: "1"
         run: |
           set -o pipefail
-          pnpm --filter lekh exec vitest run --project node src/core/editor/fuzz.test.ts 2>&1 | tee fuzz.log
+          pnpm --filter lekh-editor exec vitest run --project node src/core/editor/fuzz.test.ts 2>&1 | tee fuzz.log
       - name: File an issue
         # Only when the fuzz test failed, not when the install did.
         if: failure() && steps.fuzz.outcome == 'failure'

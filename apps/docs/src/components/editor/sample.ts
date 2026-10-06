@@ -14,12 +14,12 @@ import {
   minimumFontSize,
   type Validator,
   workingLinks,
-} from "lekh";
+} from "lekh-editor";
 import {
   createCompliancePreset,
   createReactEmailPreset,
   REACT_EMAIL_ROOT_TYPE,
-} from "lekh/blocks";
+} from "lekh-editor/blocks";
 
 import { HERO, SPOTLIGHT, WORDMARK } from "./stock";
 

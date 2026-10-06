@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useEditor, type DropRefusalProps } from "lekh/canvas";
+import { useEditor, type DropRefusalProps } from "lekh-editor/canvas";
 
 import { refusalText } from "./nesting-refusal";
 

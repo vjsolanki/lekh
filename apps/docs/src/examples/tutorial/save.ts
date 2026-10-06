@@ -1,4 +1,4 @@
-import { createEditor, type EmailDocument } from "lekh";
+import { createEditor, type EmailDocument } from "lekh-editor";
 
 import { definitions, rootType } from "./definitions";
 

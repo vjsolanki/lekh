@@ -1,4 +1,4 @@
-import type { ControlDescriptor, Editor } from "lekh";
+import type { ControlDescriptor, Editor } from "lekh-editor";
 
 /** Is this Box locked? Only when every side reads the same. */
 export function isLocked(sides: readonly ControlDescriptor[]): boolean {

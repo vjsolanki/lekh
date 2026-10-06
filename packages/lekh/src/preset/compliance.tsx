@@ -1,5 +1,5 @@
 /**
- * The compliance Preset, on `lekh/blocks`.
+ * The compliance Preset, on `lekh-editor/blocks`.
  *
  * Commercial email is regulated. CAN-SPAM wants a working opt-out mechanism and
  * a valid physical postal address in every message; GDPR and CASL add their

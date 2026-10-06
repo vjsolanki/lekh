@@ -3,7 +3,7 @@ title: Compliance Blocks
 description: "The unsubscribe link and postal address that commercial email needs."
 ---
 
-import { createCompliancePreset } from "lekh/blocks";
+import { createCompliancePreset } from "lekh-editor/blocks";
 import BlockReference from "../../../components/BlockReference.astro";
 
 Two Block Definitions that cover the legal minimum for marketing email: a
@@ -13,13 +13,13 @@ Both are **required** and **not deletable**. They ship as their own Preset, so
 an editor for transactional email like receipts and password resets never
 composes them in.
 
-They come from [`lekh/blocks`](/reference/blocks/), next to the other built-in
+They come from [`lekh-editor/blocks`](/reference/blocks/), next to the other built-in
 Blocks.
 
 ## Import
 
 ```ts
-import { createCompliancePreset } from "lekh/blocks";
+import { createCompliancePreset } from "lekh-editor/blocks";
 
 const definitions = [
   ...createReactEmailPreset(),
@@ -142,9 +142,9 @@ want a required Block, do not compose this Preset.
 
 ## Everything on this page
 
-Five names, all exported from `lekh/blocks`:
+Five names, all exported from `lekh-editor/blocks`:
 
 `createCompliancePreset`, `CompliancePresetOptions`, `UNSUBSCRIBE_TYPE`,
 `POSTAL_ADDRESS_TYPE`, `ComplianceDiagnostic`
 
-`defineBlock` and the rest come from [`lekh`](/reference/lekh/).
+`defineBlock` and the rest come from [`lekh-editor`](/reference/lekh/).

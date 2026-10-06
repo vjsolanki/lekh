@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createEditor, NONE } from "lekh";
+import { createEditor, NONE } from "lekh-editor";
 
 import {
   backgroundOfColor,

@@ -1,4 +1,8 @@
-import { usePalette, usePaletteDrag, type PaletteEntry } from "lekh/canvas";
+import {
+  usePalette,
+  usePaletteDrag,
+  type PaletteEntry,
+} from "lekh-editor/canvas";
 
 import { rootType } from "./definitions";
 

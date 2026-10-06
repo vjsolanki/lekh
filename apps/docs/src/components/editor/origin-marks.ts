@@ -1,4 +1,4 @@
-import { type ControlDescriptor } from "lekh";
+import { type ControlDescriptor } from "lekh-editor";
 
 /** What the marks read off a Control Descriptor. */
 export type Marked = Pick<ControlDescriptor, "value" | "origin" | "otherStage">;

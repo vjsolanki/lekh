@@ -1,4 +1,4 @@
-import { defineBlock, RichText } from "lekh";
+import { defineBlock, RichText } from "lekh-editor";
 
 /** Body copy that holds paragraphs and lists. */
 export const bodyCopy = defineBlock<{ content: string; fontSize: number }>({

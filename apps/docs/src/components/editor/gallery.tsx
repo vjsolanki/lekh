@@ -6,8 +6,8 @@ import {
   type ComponentType,
   type ReactNode,
 } from "react";
-import type { Asset, ImageRequest, ImageResolver } from "lekh";
-import { useEditor } from "lekh/canvas";
+import type { Asset, ImageRequest, ImageResolver } from "lekh-editor";
+import { useEditor } from "lekh-editor/canvas";
 
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -39,7 +39,7 @@ import { STOCK, type StockImage } from "./stock";
 /**
  * The Consumer's half of the one image hook.
  *
- * `lekh` never assumes a file means an upload — it says why it wants an image,
+ * `lekh-editor` never assumes a file means an upload — it says why it wants an image,
  * hands over whatever files arrived with the gesture, and waits. Everything
  * below is this example's answer to that: an asset gallery, a fake upload that
  * reports progress and respects the abort signal, and a switch for making it

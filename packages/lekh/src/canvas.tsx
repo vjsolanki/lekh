@@ -1,14 +1,14 @@
 "use client";
 
 /**
- * The Canvas — `lekh/canvas`.
+ * The Canvas — `lekh-editor/canvas`.
  *
  * The browser half of the editor: the Document rendered into an isolated
  * iframe, Drop Targets resolved from real geometry, selection tracked and
  * keystrokes bound in both documents. It renders no Chrome — every outline,
  * indicator and toolbar comes from the Consumer through a Slot.
  *
- * Separate from `lekh` because this is the only part that
+ * Separate from `lekh-editor` because this is the only part that
  * needs a browser, and the only part carrying a client-only directive.
  */
 

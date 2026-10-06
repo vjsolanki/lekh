@@ -1,4 +1,4 @@
-import { defineBlock } from "lekh";
+import { defineBlock } from "lekh-editor";
 
 /** One `padding` number as `paddingX` and `paddingY`, if there is one. */
 function splitPadding(values: Readonly<Record<string, unknown>>) {

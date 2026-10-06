@@ -1,4 +1,4 @@
-import { useEditor } from "lekh/canvas";
+import { useEditor } from "lekh-editor/canvas";
 
 import { useEditorValue } from "./subscribe-selector";
 

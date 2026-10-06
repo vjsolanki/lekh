@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The Tiptap Text Engine — `lekh/tiptap`.
+ * The Tiptap Text Engine — `lekh-editor/tiptap`.
  *
  * The shipped adapter for ADR-0005, behind its own entry point with Tiptap as
  * an *optional* peer dependency, the same shape as the react.email Preset

@@ -7,7 +7,7 @@
  * already exist.
  */
 
-import type { Asset } from "lekh";
+import type { Asset } from "lekh-editor";
 
 export interface StockImage extends Asset {
   readonly label: string;

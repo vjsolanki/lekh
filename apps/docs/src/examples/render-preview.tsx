@@ -1,5 +1,5 @@
-import { type EmailDocument, renderDocument, toHtml } from "lekh";
-import { createReactEmailPreset } from "lekh/blocks";
+import { type EmailDocument, renderDocument, toHtml } from "lekh-editor";
+import { createReactEmailPreset } from "lekh-editor/blocks";
 
 const definitions = createReactEmailPreset();
 

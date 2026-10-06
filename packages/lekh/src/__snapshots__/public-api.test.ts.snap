@@ -1,6 +1,100 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`public API > lekh exports a pinned set of names 1`] = `
+exports[`public API > lekh offers a pinned set of Control Descriptor fields 1`] = `
+[
+  "advanced",
+  "against",
+  "blockId",
+  "box",
+  "cancel",
+  "clearOverride",
+  "clients",
+  "commit",
+  "constraints",
+  "direction",
+  "group",
+  "kind",
+  "label",
+  "name",
+  "origin",
+  "otherStage",
+  "overridable",
+  "preview",
+  "primary",
+  "reset",
+  "set",
+  "side",
+  "suggested",
+  "value",
+]
+`;
+
+exports[`public API > lekh offers a pinned set of Editor methods 1`] = `
+[
+  "applyExternalOps",
+  "applyRepair",
+  "cancelPendingChange",
+  "canDuplicate",
+  "canInsert",
+  "canMove",
+  "canRedo",
+  "canRemove",
+  "canUndo",
+  "clearMobileOverride",
+  "commitPendingChange",
+  "duplicateBlock",
+  "edit",
+  "explainDropRefusal",
+  "getAddableChildren",
+  "getBlock",
+  "getControls",
+  "getDefinition",
+  "getDefinitions",
+  "getDiagnostics",
+  "getDivision",
+  "getDocument",
+  "getDocumentWithPendingChange",
+  "getDocumentWithSuggestions",
+  "getDropTargets",
+  "getEditableChildren",
+  "getEditing",
+  "getHovered",
+  "getImageBlockType",
+  "getImageRequests",
+  "getLastAction",
+  "getPendingChange",
+  "getRenderOptions",
+  "getSelectable",
+  "getSelection",
+  "getStage",
+  "getSuggestions",
+  "getSuggestionsAt",
+  "hover",
+  "insertBlock",
+  "markTextEdit",
+  "moveBlock",
+  "onOp",
+  "onReveal",
+  "place",
+  "redo",
+  "removeBlock",
+  "replaceImage",
+  "resolveDropTarget",
+  "reveal",
+  "select",
+  "setPendingChange",
+  "setProp",
+  "setStage",
+  "subscribe",
+  "subscribeToHover",
+  "subscribeToPendingChange",
+  "subscribeToSuggestions",
+  "suggest",
+  "undo",
+]
+`;
+
+exports[`public API > lekh-editor exports a pinned set of names 1`] = `
 [
   "AcceptOutcome",
   "Action",
@@ -144,101 +238,7 @@ exports[`public API > lekh exports a pinned set of names 1`] = `
 ]
 `;
 
-exports[`public API > lekh offers a pinned set of Control Descriptor fields 1`] = `
-[
-  "advanced",
-  "against",
-  "blockId",
-  "box",
-  "cancel",
-  "clearOverride",
-  "clients",
-  "commit",
-  "constraints",
-  "direction",
-  "group",
-  "kind",
-  "label",
-  "name",
-  "origin",
-  "otherStage",
-  "overridable",
-  "preview",
-  "primary",
-  "reset",
-  "set",
-  "side",
-  "suggested",
-  "value",
-]
-`;
-
-exports[`public API > lekh offers a pinned set of Editor methods 1`] = `
-[
-  "applyExternalOps",
-  "applyRepair",
-  "cancelPendingChange",
-  "canDuplicate",
-  "canInsert",
-  "canMove",
-  "canRedo",
-  "canRemove",
-  "canUndo",
-  "clearMobileOverride",
-  "commitPendingChange",
-  "duplicateBlock",
-  "edit",
-  "explainDropRefusal",
-  "getAddableChildren",
-  "getBlock",
-  "getControls",
-  "getDefinition",
-  "getDefinitions",
-  "getDiagnostics",
-  "getDivision",
-  "getDocument",
-  "getDocumentWithPendingChange",
-  "getDocumentWithSuggestions",
-  "getDropTargets",
-  "getEditableChildren",
-  "getEditing",
-  "getHovered",
-  "getImageBlockType",
-  "getImageRequests",
-  "getLastAction",
-  "getPendingChange",
-  "getRenderOptions",
-  "getSelectable",
-  "getSelection",
-  "getStage",
-  "getSuggestions",
-  "getSuggestionsAt",
-  "hover",
-  "insertBlock",
-  "markTextEdit",
-  "moveBlock",
-  "onOp",
-  "onReveal",
-  "place",
-  "redo",
-  "removeBlock",
-  "replaceImage",
-  "resolveDropTarget",
-  "reveal",
-  "select",
-  "setPendingChange",
-  "setProp",
-  "setStage",
-  "subscribe",
-  "subscribeToHover",
-  "subscribeToPendingChange",
-  "subscribeToSuggestions",
-  "suggest",
-  "undo",
-]
-`;
-
-exports[`public API > lekh/blocks exports a pinned set of names 1`] = `
+exports[`public API > lekh-editor/blocks exports a pinned set of names 1`] = `
 [
   "buttonBlock",
   "columnsBlock",
@@ -269,7 +269,7 @@ exports[`public API > lekh/blocks exports a pinned set of names 1`] = `
 ]
 `;
 
-exports[`public API > lekh/canvas exports a pinned set of names 1`] = `
+exports[`public API > lekh-editor/canvas exports a pinned set of names 1`] = `
 [
   "BlockChromeProps",
   "BlockDrag",
@@ -312,7 +312,7 @@ exports[`public API > lekh/canvas exports a pinned set of names 1`] = `
 ]
 `;
 
-exports[`public API > lekh/canvas offers a pinned set of Slots 1`] = `
+exports[`public API > lekh-editor/canvas offers a pinned set of Slots 1`] = `
 [
   "boxEdges",
   "diagnostic",
@@ -332,7 +332,7 @@ exports[`public API > lekh/canvas offers a pinned set of Slots 1`] = `
 ]
 `;
 
-exports[`public API > lekh/tiptap exports a pinned set of names 1`] = `
+exports[`public API > lekh-editor/tiptap exports a pinned set of names 1`] = `
 [
   "createTiptapTextEngine",
   "TiptapTextEngine",

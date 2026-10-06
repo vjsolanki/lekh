@@ -1,5 +1,5 @@
-import type { BlockDefinition } from "lekh";
-import { createReactEmailPreset } from "lekh/blocks";
+import type { BlockDefinition } from "lekh-editor";
+import { createReactEmailPreset } from "lekh-editor/blocks";
 
 import { callout } from "./your-callout";
 

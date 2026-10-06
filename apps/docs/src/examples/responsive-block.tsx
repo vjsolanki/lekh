@@ -1,4 +1,4 @@
-import { classNames, defineBlock, MobileStyles } from "lekh";
+import { classNames, defineBlock, MobileStyles } from "lekh-editor";
 
 /** A column that stacks and can be hidden — both ordinary boolean props. */
 export const column = defineBlock<{

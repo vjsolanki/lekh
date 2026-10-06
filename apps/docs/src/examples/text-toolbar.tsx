@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { TextToolbarProps } from "lekh/canvas";
+import type { TextToolbarProps } from "lekh-editor/canvas";
 
 export function TextToolbar({ rect, formatting, commands }: TextToolbarProps) {
   const [linking, setLinking] = useState(false);

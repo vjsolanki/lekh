@@ -1,4 +1,4 @@
-import type { Asset, ImageResolver } from "lekh";
+import type { Asset, ImageResolver } from "lekh-editor";
 
 /**
  * Answer every ask for an image.

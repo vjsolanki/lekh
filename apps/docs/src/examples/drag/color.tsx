@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import type { ControlDescriptor } from "lekh";
+import type { ControlDescriptor } from "lekh-editor";
 import { useShownValue } from "./shown-value";
 
 /**

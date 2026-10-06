@@ -1,4 +1,4 @@
-import type { DropRefusal, Editor } from "lekh";
+import type { DropRefusal, Editor } from "lekh-editor";
 
 /**
  * Say why a drop was turned down, in your product's voice.

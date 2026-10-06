@@ -1,24 +1,24 @@
 ---
-title: lekh/canvas
+title: lekh-editor/canvas
 description: "The editing surface, the palette hooks, commands and keyboard shortcuts."
 ---
 
 Everything that needs a browser: the canvas people edit on, the hooks that make
 a palette draggable, and the command set behind the keyboard shortcuts.
 
-This is the only entry point besides `lekh/tiptap` marked `"use client"`. Keep
+This is the only entry point besides `lekh-editor/tiptap` marked `"use client"`. Keep
 it out of a send job and no editor reaches that bundle.
 
 :::caution[Settling]
 Slots and commands work, but expect some renaming as more products use them.
 :::
 
-![Gzipped size of lekh/canvas](https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2Fvjsolanki%2F5d00f9ab6617974fe2b6a95b643ce5b7%2Fraw%2Flekh-canvas.json)
+![Gzipped size of lekh-editor/canvas](https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2Fvjsolanki%2F5d00f9ab6617974fe2b6a95b643ce5b7%2Fraw%2Flekh-editor-canvas.json)
 
 ## Import
 
 ```tsx
-import { Canvas, EditorProvider, useEditor } from "lekh/canvas";
+import { Canvas, EditorProvider, useEditor } from "lekh-editor/canvas";
 ```
 
 ## EditorProvider
@@ -364,7 +364,7 @@ commands.undo();
 ```
 
 The command set for the surrounding `EditorProvider`'s editor. It is
-[`createCommands`](/reference/lekh/#commands) from `lekh`, made once per
+[`createCommands`](/reference/lekh/#commands) from `lekh-editor`, made once per
 editor. See there for the eleven actions, what each returns, and the `can`
 checks that say whether one would do anything.
 

@@ -1,6 +1,6 @@
 import { useEffect, type RefObject } from "react";
 
-import type { Action, Editor } from "lekh";
+import type { Action, Editor } from "lekh-editor";
 
 /** Where a Block's element sat, in the frame's own document coordinates. */
 interface Place {

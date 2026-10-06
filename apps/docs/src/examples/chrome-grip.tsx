@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { useBlockDrag, type BlockChromeProps } from "lekh/canvas";
+import { useBlockDrag, type BlockChromeProps } from "lekh-editor/canvas";
 
 /**
  * A grip on the selected Block's top-left corner.

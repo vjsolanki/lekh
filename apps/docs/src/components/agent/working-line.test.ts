@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { Edit } from "lekh";
+import type { Edit } from "lekh-editor";
 
 import { workingLine, type Names } from "./working-line";
 

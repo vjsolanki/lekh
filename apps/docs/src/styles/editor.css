@@ -1,6 +1,6 @@
 /*
  * The example editor's stylesheet. Everything it describes belongs to this
- * example, not to the library — `lekh` draws no chrome of its own.
+ * example, not to the library — `lekh-editor` draws no chrome of its own.
  *
  * The email is the only white sheet on screen, framed by crop marks. The
  * chrome around it is plain neutral grey. Green is kept for marks: selection,

@@ -1,4 +1,4 @@
-import type { Editor } from "lekh";
+import type { Editor } from "lekh-editor";
 
 /**
  * Choose what to animate from how the last change came about. `flash` and

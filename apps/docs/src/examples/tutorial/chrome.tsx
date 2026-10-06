@@ -3,7 +3,7 @@ import type {
   CanvasSlots,
   DropIndicatorProps,
   TextToolbarProps,
-} from "lekh/canvas";
+} from "lekh-editor/canvas";
 
 /**
  * Every Block-shaped Slot draws the same way: take the rectangle, put an

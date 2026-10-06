@@ -130,7 +130,7 @@ button's fill. Give it a way back to nothing by setting the exported `NONE`, and
 show the emptied state as something other than black:
 
 ```tsx
-import { NONE, SchemaKind } from "lekh";
+import { NONE, SchemaKind } from "lekh-editor";
 
 case SchemaKind.surface:
   return <ColorInput control={control} onClear={() => control.set(NONE)} />;
@@ -253,7 +253,7 @@ to the Preset as `colors`, and each colour's Control Descriptor carries them in
 `constraints.brandColors`. Read them with `brandColorsOf`:
 
 ```ts
-import { brandColorsOf } from "lekh";
+import { brandColorsOf } from "lekh-editor";
 
 const brand = brandColorsOf(control.constraints); // [{ label, value }]
 ```

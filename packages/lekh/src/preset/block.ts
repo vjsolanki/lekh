@@ -47,7 +47,7 @@ export function definitionsOf(
   return blocks.flatMap((block) => {
     if (!isEntry(block)) {
       throw new Error(
-        `${JSON.stringify(block) ?? typeof block} is not a Block from lekh/blocks. ` +
+        `${JSON.stringify(block) ?? typeof block} is not a Block from lekh-editor/blocks. ` +
           "List the Blocks it exports, such as textBlock.",
       );
     }

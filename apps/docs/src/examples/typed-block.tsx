@@ -1,4 +1,4 @@
-import { defineBlock, SchemaKind } from "lekh";
+import { defineBlock, SchemaKind } from "lekh-editor";
 
 /**
  * A type alias, not an interface.

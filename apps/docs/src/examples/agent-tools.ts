@@ -1,4 +1,4 @@
-import { agentTools, type Editor } from "lekh";
+import { agentTools, type Editor } from "lekh-editor";
 
 /**
  * Run one turn of your agent against the editor.

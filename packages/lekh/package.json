@@ -1,5 +1,5 @@
 {
-  "name": "lekh",
+  "name": "lekh-editor",
   "version": "0.1.0",
   "description": "A headless engine for building drag-and-drop email editors: the Document, the editing mechanics, and the path to sendable markup.",
   "keywords": [

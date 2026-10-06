@@ -1,4 +1,4 @@
-import { defineBlock } from "lekh";
+import { defineBlock } from "lekh-editor";
 
 /** A leaf of your own, standing in for whatever your product needs. */
 export const callout = defineBlock<{ text: string; tone: string }>({

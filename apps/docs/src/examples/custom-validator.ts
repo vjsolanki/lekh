@@ -1,5 +1,5 @@
-import { isBlank } from "lekh";
-import type { Block, Diagnostic, SetPropRepair, Validator } from "lekh";
+import { isBlank } from "lekh-editor";
+import type { Block, Diagnostic, SetPropRepair, Validator } from "lekh-editor";
 
 import { resolvedProp } from "./resolved-prop";
 

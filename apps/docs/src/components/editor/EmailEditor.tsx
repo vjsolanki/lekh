@@ -20,7 +20,7 @@ import {
   type Stage,
   toHtml,
   type ToHtmlOptions,
-} from "lekh";
+} from "lekh-editor";
 import {
   Canvas,
   EditorProvider,
@@ -28,8 +28,8 @@ import {
   useEditor,
   useEditorState,
   type CanvasSlots,
-} from "lekh/canvas";
-import { createTiptapTextEngine } from "lekh/tiptap";
+} from "lekh-editor/canvas";
+import { createTiptapTextEngine } from "lekh-editor/tiptap";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -182,7 +182,7 @@ export interface AgentPart {
  *
  * Everything visible is this file's or its neighbours': the chrome, the
  * palette, the Inspector, every outline and toolbar drawn over the Canvas, and
- * the dialog that answers the image hook. `lekh` supplies the Document, the
+ * the dialog that answers the image hook. `lekh-editor` supplies the Document, the
  * editing mechanics, the drag geometry and the path to markup — and draws no
  * pixels of its own.
  *

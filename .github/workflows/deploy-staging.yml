@@ -27,7 +27,7 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      # Same ordering reason as CI: the docs site resolves `lekh` through the
+      # Same ordering reason as CI: the docs site resolves `lekh-editor` through the
       # published types in dist/, so the library has to be built first. `pnpm
       # build` is recursive and does both in dependency order.
       - run: pnpm build

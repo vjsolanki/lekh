@@ -4,7 +4,7 @@ import {
   type Block,
   type DropTarget,
   type Editor,
-} from "lekh";
+} from "lekh-editor";
 
 /**
  * What an Author reads for a Block, a container and a place in the email.

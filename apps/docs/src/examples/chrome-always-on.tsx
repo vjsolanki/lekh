@@ -5,7 +5,7 @@ import {
   type BlockChromeProps,
   type CanvasSlots,
   type Rect,
-} from "lekh/canvas";
+} from "lekh-editor/canvas";
 
 /**
  * Every Block-shaped Slot draws the same way: take the rectangle, put an

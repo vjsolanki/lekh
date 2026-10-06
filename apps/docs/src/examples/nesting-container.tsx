@@ -1,4 +1,4 @@
-import { defineBlock } from "lekh";
+import { defineBlock } from "lekh-editor";
 
 /**
  * A row and the columns it owns — the shape every nesting rule exists for.

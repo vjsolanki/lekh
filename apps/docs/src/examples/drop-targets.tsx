@@ -1,4 +1,4 @@
-import { Canvas, type DropTargetProps } from "lekh/canvas";
+import { Canvas, type DropTargetProps } from "lekh-editor/canvas";
 
 /** One faint mark for every place the Block may land. */
 function FaintDropTarget({ target, rect, current }: DropTargetProps) {

@@ -1,6 +1,6 @@
 import { useState, type ReactNode } from "react";
-import type { Block, Editor } from "lekh";
-import { useEditorState } from "lekh/canvas";
+import type { Block, Editor } from "lekh-editor";
+import { useEditorState } from "lekh-editor/canvas";
 
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";

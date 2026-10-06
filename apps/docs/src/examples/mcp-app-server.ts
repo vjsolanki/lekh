@@ -17,8 +17,11 @@ import {
   type EmailDocument,
   renderPreview,
   type SuggestionJSON,
-} from "lekh";
-import { createReactEmailPreset, REACT_EMAIL_ROOT_TYPE } from "lekh/blocks";
+} from "lekh-editor";
+import {
+  createReactEmailPreset,
+  REACT_EMAIL_ROOT_TYPE,
+} from "lekh-editor/blocks";
 
 /** The Canvas, bundled into one HTML file. See mcp-app-canvas.tsx. */
 const CANVAS_URI = "ui://your-emails/canvas.html";

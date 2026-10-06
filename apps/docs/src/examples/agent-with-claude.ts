@@ -1,5 +1,5 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { agentTools, type Editor } from "lekh";
+import { agentTools, type Editor } from "lekh-editor";
 
 const client = new Anthropic();
 

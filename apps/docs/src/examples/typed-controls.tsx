@@ -1,4 +1,4 @@
-import type { ControlDescriptor } from "lekh";
+import type { ControlDescriptor } from "lekh-editor";
 import type { ReactElement } from "react";
 
 /**

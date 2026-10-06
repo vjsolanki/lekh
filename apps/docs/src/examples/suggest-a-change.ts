@@ -1,4 +1,4 @@
-import type { AcceptOutcome, EditRefusal, Editor } from "lekh";
+import type { AcceptOutcome, EditRefusal, Editor } from "lekh-editor";
 
 /**
  * Show your users a bigger font on one Block, and let them decide.

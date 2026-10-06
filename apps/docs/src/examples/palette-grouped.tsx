@@ -1,4 +1,4 @@
-import { useEditor, usePalette, usePaletteDrag } from "lekh/canvas";
+import { useEditor, usePalette, usePaletteDrag } from "lekh-editor/canvas";
 
 /** Your own grouping. The library offers a flat list and no opinion. */
 const GROUPS: Record<string, readonly string[]> = {

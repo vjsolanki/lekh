@@ -505,7 +505,7 @@ describe("picking the Preset's Blocks", () => {
 
   it("throws on a look-alike that is not one of its Blocks", () => {
     expect(() => pickReactEmailPreset([{ type: "text" }])).toThrow(
-      '{"type":"text"} is not a Block from lekh/blocks.',
+      '{"type":"text"} is not a Block from lekh-editor/blocks.',
     );
   });
 
@@ -519,7 +519,7 @@ describe("picking the Preset's Blocks", () => {
         // oxlint-disable-next-line typescript/no-unsafe-type-assertion
         entry as unknown as ReactEmailBlock,
       ]),
-    ).toThrow(/is not a Block from lekh\/blocks/u);
+    ).toThrow(/is not a Block from lekh-editor\/blocks/u);
   });
 });
 

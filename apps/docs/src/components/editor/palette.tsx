@@ -1,11 +1,11 @@
 import type { ReactNode } from "react";
-import type { BlockDefinition, Editor } from "lekh";
+import type { BlockDefinition, Editor } from "lekh-editor";
 import {
   useEditor,
   usePalette,
   usePaletteDrag,
   type PaletteEntry,
-} from "lekh/canvas";
+} from "lekh-editor/canvas";
 
 import { ScrollArea } from "@/components/ui/scroll-area";
 

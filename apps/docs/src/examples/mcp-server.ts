@@ -10,8 +10,11 @@ import {
   createEditor,
   type EmailDocument,
   renderPreview,
-} from "lekh";
-import { createReactEmailPreset, REACT_EMAIL_ROOT_TYPE } from "lekh/blocks";
+} from "lekh-editor";
+import {
+  createReactEmailPreset,
+  REACT_EMAIL_ROOT_TYPE,
+} from "lekh-editor/blocks";
 
 /** Where your users edit emails in their browser. */
 const EDITOR_URL = "https://app.example.com/emails";

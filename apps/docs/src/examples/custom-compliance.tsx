@@ -1,5 +1,5 @@
-import { defineBlock, isBlank } from "lekh";
-import type { Preset, SetPropRepair } from "lekh";
+import { defineBlock, isBlank } from "lekh-editor";
+import type { Preset, SetPropRepair } from "lekh-editor";
 
 import { resolvedProp } from "./resolved-prop";
 

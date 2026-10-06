@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import { Canvas, type SuggestionChromeProps } from "lekh/canvas";
+import { Canvas, type SuggestionChromeProps } from "lekh-editor/canvas";
 
 /**
  * Draw each open Suggestion: a dashed outline on every Block it touches, and

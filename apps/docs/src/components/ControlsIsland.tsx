@@ -5,7 +5,7 @@ import {
   defineBlock,
   renderDocument,
   toHtml,
-} from "lekh";
+} from "lekh-editor";
 
 /**
  * A React island: what `getControls()` hands you, beside what you draw from it.

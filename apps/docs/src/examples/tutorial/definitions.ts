@@ -1,4 +1,7 @@
-import { createReactEmailPreset, REACT_EMAIL_ROOT_TYPE } from "lekh/blocks";
+import {
+  createReactEmailPreset,
+  REACT_EMAIL_ROOT_TYPE,
+} from "lekh-editor/blocks";
 
 /**
  * The Blocks this editor offers.

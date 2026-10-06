@@ -5,8 +5,8 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from "react";
-import type { CommandName } from "lekh";
-import { useCommands, useEditorState } from "lekh/canvas";
+import type { CommandName } from "lekh-editor";
+import { useCommands, useEditorState } from "lekh-editor/canvas";
 import { Dialog as DialogPrimitive } from "radix-ui";
 
 import { Dialog, DialogContent } from "@/components/ui/dialog";

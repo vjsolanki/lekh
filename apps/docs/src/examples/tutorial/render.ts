@@ -1,4 +1,4 @@
-import { type Editor, renderDocument, toHtml } from "lekh";
+import { type Editor, renderDocument, toHtml } from "lekh-editor";
 
 /**
  * The email as markup a mail client will accept.

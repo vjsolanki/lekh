@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SchemaKind } from "lekh";
+import { SchemaKind } from "lekh-editor";
 
 import { foldSummary, type Summarised } from "./fold-summary";
 

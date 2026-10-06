@@ -7,7 +7,7 @@
  * takes this one off. One that only moved the selection does neither.
  */
 
-import type { Action } from "lekh";
+import type { Action } from "lekh-editor";
 
 /** Whether Undo still applies, given every Action since the accept. */
 export function canUndoAccept(after: readonly Action[]): boolean {

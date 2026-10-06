@@ -16,8 +16,8 @@ import {
   type EmailReading,
   type Suggestion,
   type SuggestionTouch,
-} from "lekh";
-import { useEditor, useEditorState } from "lekh/canvas";
+} from "lekh-editor";
+import { useEditor, useEditorState } from "lekh-editor/canvas";
 
 import { countOf, plan } from "./agent";
 import { FIRST_EMAIL } from "./first-email";

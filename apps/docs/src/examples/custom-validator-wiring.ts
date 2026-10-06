@@ -1,4 +1,9 @@
-import { createEditor, minimumFontSize, renderDocument, toHtml } from "lekh";
+import {
+  createEditor,
+  minimumFontSize,
+  renderDocument,
+  toHtml,
+} from "lekh-editor";
 
 import { houseStyle, INSECURE_LINK } from "./custom-validator";
 import { definitions } from "./preset-plus-your-block";

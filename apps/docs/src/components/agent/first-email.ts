@@ -6,7 +6,7 @@
  * by `parent`. Nothing here counts an index.
  */
 
-import type { Asset, Edit } from "lekh";
+import type { Asset, Edit } from "lekh-editor";
 
 import { HERO, WORDMARK } from "@/components/editor/stock";
 

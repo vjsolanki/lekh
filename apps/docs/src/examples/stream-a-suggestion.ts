@@ -1,4 +1,4 @@
-import type { Edit, EditRefusal, Editor } from "lekh";
+import type { Edit, EditRefusal, Editor } from "lekh-editor";
 
 /**
  * Show a first draft as your agent writes it, one batch of Edits at a time.

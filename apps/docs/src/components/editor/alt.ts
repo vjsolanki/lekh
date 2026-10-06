@@ -1,4 +1,4 @@
-import type { Asset } from "lekh";
+import type { Asset } from "lekh-editor";
 
 /** What the Author said about alt text, after picking. */
 export interface AltAnswer {

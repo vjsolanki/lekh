@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
-import type { Block } from "lekh";
-import { useEditor, useEditorState } from "lekh/canvas";
+import type { Block } from "lekh-editor";
+import { useEditor, useEditorState } from "lekh-editor/canvas";
 
 /**
  * One row of your own Layers list. It lights when the pointer is over its

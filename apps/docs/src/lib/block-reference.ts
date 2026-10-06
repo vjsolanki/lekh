@@ -1,4 +1,4 @@
-import type { BlockDefinition, SchemaEntry } from "lekh";
+import type { BlockDefinition, SchemaEntry } from "lekh-editor";
 
 /**
  * A table cell's contents: words, and the pieces of them that are code.

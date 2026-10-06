@@ -1,5 +1,5 @@
 /**
- * The shipped Validators, on `lekh`.
+ * The shipped Validators, on `lekh-editor`.
  *
  * Three heuristics a Consumer opts into: text too small to read, text hidden
  * against its background, and links that go nowhere. Nothing here is wired up

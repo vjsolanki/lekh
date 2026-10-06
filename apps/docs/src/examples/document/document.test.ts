@@ -4,8 +4,8 @@ import {
   type EmailDocument,
   renderDocument,
   toHtml,
-} from "lekh";
-import { createReactEmailPreset } from "lekh/blocks";
+} from "lekh-editor";
+import { createReactEmailPreset } from "lekh-editor/blocks";
 import { describe, expect, it } from "vitest";
 
 import unstampedHeading from "./unstamped-heading.json";

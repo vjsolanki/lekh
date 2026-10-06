@@ -1,5 +1,5 @@
 import { useCallback, useSyncExternalStore } from "react";
-import type { Editor } from "lekh";
+import type { Editor } from "lekh-editor";
 
 /**
  * `useEditorState` over an editor you hold yourself, for when there is no

@@ -1,6 +1,6 @@
 import { useCallback, useSyncExternalStore } from "react";
-import type { EmailDocument } from "lekh";
-import { useEditor } from "lekh/canvas";
+import type { EmailDocument } from "lekh-editor";
+import { useEditor } from "lekh-editor/canvas";
 
 /**
  * The Document as the Canvas shows it, for your own preview pane.

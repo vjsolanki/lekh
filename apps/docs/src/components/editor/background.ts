@@ -1,4 +1,4 @@
-import { NONE, type Editor } from "lekh";
+import { NONE, type Editor } from "lekh-editor";
 
 /**
  * A background image and the colour that stands in for it.

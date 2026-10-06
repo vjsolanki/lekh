@@ -1,6 +1,6 @@
 import { useCallback, useSyncExternalStore } from "react";
-import type { ControlDescriptor } from "lekh";
-import { useEditor } from "lekh/canvas";
+import type { ControlDescriptor } from "lekh-editor";
+import { useEditor } from "lekh-editor/canvas";
 
 /**
  * The value the Canvas shows for this control: the one being dragged, or the

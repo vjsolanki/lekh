@@ -10,7 +10,7 @@ export default defineConfig({
   // built from it.
   site: "https://lekh.x23lab.com",
   // Old links. The agent example plugs into the editor, and lekh/preset is now
-  // lekh/blocks.
+  // lekh-editor/blocks.
   redirects: {
     "/agent/": "/editor/",
     "/reference/preset/": "/reference/blocks/",
@@ -202,15 +202,15 @@ export default defineConfig({
         {
           label: "Reference",
           items: [
-            { label: "lekh", slug: "reference/lekh" },
+            { label: "lekh-editor", slug: "reference/lekh" },
             { label: "The Document", slug: "reference/document" },
             { label: "Render", slug: "reference/render" },
             { label: "Validators", slug: "reference/validators" },
             { label: "Agent tools", slug: "reference/agent" },
-            { label: "lekh/canvas", slug: "reference/canvas" },
-            { label: "lekh/blocks", slug: "reference/blocks" },
+            { label: "lekh-editor/canvas", slug: "reference/canvas" },
+            { label: "lekh-editor/blocks", slug: "reference/blocks" },
             { label: "Compliance Blocks", slug: "reference/compliance" },
-            { label: "lekh/tiptap", slug: "reference/tiptap" },
+            { label: "lekh-editor/tiptap", slug: "reference/tiptap" },
           ],
         },
         {

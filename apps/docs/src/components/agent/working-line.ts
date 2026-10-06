@@ -3,7 +3,7 @@
  * still arriving. The line comes from Edits only, never from the agent.
  */
 
-import type { Edit, Editor } from "lekh";
+import type { Edit, Editor } from "lekh-editor";
 
 /** How the line names things. Each gives nothing for what it doesn't know. */
 export interface Names {

@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
-import type { ControlDescriptor } from "lekh";
-import { useEditor } from "lekh/canvas";
+import type { ControlDescriptor } from "lekh-editor";
+import { useEditor } from "lekh-editor/canvas";
 import { useShownValue } from "./shown-value";
 
 const SIDES = [

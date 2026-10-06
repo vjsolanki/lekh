@@ -1,5 +1,8 @@
-import { defineBlock } from "lekh";
-import { createCompliancePreset, createReactEmailPreset } from "lekh/blocks";
+import { defineBlock } from "lekh-editor";
+import {
+  createCompliancePreset,
+  createReactEmailPreset,
+} from "lekh-editor/blocks";
 import { describe, expect, it } from "vitest";
 
 import { describeBlocks, type Inline } from "./block-reference";

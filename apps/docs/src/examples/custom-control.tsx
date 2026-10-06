@@ -1,4 +1,4 @@
-import { defineBlock, type ControlDescriptor } from "lekh";
+import { defineBlock, type ControlDescriptor } from "lekh-editor";
 
 /**
  * A kind the library has never heard of.
