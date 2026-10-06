@@ -1,7 +1,6 @@
 {
   "name": "lekh",
-  "version": "0.0.0",
-  "private": true,
+  "version": "0.1.0",
   "description": "A headless engine for building drag-and-drop email editors: the Document, the editing mechanics, and the path to sendable markup.",
   "keywords": [
     "email",
@@ -56,6 +55,9 @@
   },
   "scripts": {
     "build": "tsdown",
+    "prepublishOnly": "pnpm build",
+    "prepack": "cp ../../README.md ../../LICENSE .",
+    "postpack": "rm README.md LICENSE",
     "dev": "tsdown --watch",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
