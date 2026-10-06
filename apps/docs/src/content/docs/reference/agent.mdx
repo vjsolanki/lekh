@@ -1,0 +1,153 @@
+---
+title: Agent tools
+description: "Ready tools that let your agent read and change an email."
+---
+
+import { Code } from "@astrojs/starlight/components";
+import agentToolsExample from "../../../examples/agent-tools.ts?raw";
+
+Four tools you hand to your agent, and a function that runs its tool calls
+against your editor.
+
+The library calls no model. You pick the model, hold the keys and draw the
+chat. The tools work with any model SDK or MCP server, because each one is a
+name, a description and a JSON Schema input.
+
+To wire one up end to end, start with
+[Add an agent to your editor](/guides/add-an-agent/).
+
+## Import
+
+```ts
+import { agentTools } from "lekh";
+```
+
+## agentTools
+
+```ts
+function agentTools(editor: Editor, options?: AgentToolsOptions): AgentTools;
+```
+
+Gives back `definitions` and `call`. Hand `definitions` to your model SDK. Run
+each tool call your agent makes through `call`, and send the result back.
+
+<Code code={agentToolsExample} lang="ts" title="agent-tools.ts" />
+
+`call` never throws. Each `AgentToolResult` has `content`, plain data you can
+pass through `JSON.stringify`, and `isError`.
+
+`isError` is `true` when the call could not run: no tool has that name, the
+input is the wrong shape, or the email would not render. A refused Suggestion is
+not an error. It lists a reason for each change, so your agent can fix them and
+try again.
+
+### Options
+
+| Option       | Type      | Default | What it does                                          |
+| ------------ | --------- | ------- | ----------------------------------------------------- |
+| `focus`      | `string`  | none    | The id of the Block your users are asking about.      |
+| `autoAccept` | `boolean` | `false` | Accept each Suggestion at once. For jobs nobody sees. |
+| `meta`       | `unknown` | none    | Stored on each Suggestion, to tie it to your thread.  |
+
+A Suggestion is a change your agent proposes. It is shown on the Canvas, the
+editing surface, but not stored until your users accept it.
+
+`focus` is a hint. `read_email` gives that Block first, and the descriptions
+name it. Your agent can still change other Blocks, such as adding a P.S. under
+it. Your users see every Block a Suggestion touches before anything lands.
+
+Make a new set of tools each time the focus changes. It costs nothing.
+
+## The tools
+
+| Name              | Input              | Gives back                                         |
+| ----------------- | ------------------ | -------------------------------------------------- |
+| `read_email`      | nothing            | The Document, with the focused Block first.        |
+| `describe_blocks` | nothing            | Each Block type's props as JSON Schema.            |
+| `suggest`         | `{ edits, note? }` | A Suggestion's id and Diagnostics, or the reasons. |
+| `render_preview`  | nothing            | The email as `html` and as plain `text`.           |
+
+`AgentToolName` is the union of these names.
+
+### read_email
+
+Gives an `EmailReading`: the stored `document`, and `focus` when you set one. A
+Document is the JSON tree that holds an email. Each Block in it has an `id`, a
+`type`, its `props` and its `children`.
+
+`focus` is the focused Block with `parentId`, the id of the Block it sits in.
+It comes first, so your agent reads it before anything else.
+
+### describe_blocks
+
+Gives `rootType` and `blocks`, the output of
+[`describeBlocks`](/reference/lekh/#suggesting-a-change). A prop closed to your
+agent is left out.
+
+### suggest
+
+Calls `editor.suggest` with your agent's Edits and `note`. An Edit is one
+change, such as setting a prop or inserting a Block. It names Blocks by id, and
+places a Block `after` or `before` a sibling, or inside a `parent`.
+
+Your users accept the Suggestion or reject it whole. With `autoAccept`, it is
+accepted straight away, as one undo step.
+
+The result is one of:
+
+- `{ status: "open", suggestion, diagnostics }`
+- `{ status: "accepted", suggestion, diagnostics }`, with `autoAccept`
+- `{ status: "refused", reasons }`
+
+A Diagnostic is a problem the email would have, such as an empty button label.
+It never stops a Suggestion.
+
+The editor refuses an Edit it cannot carry out. That includes a bare image URL
+where an image goes, and a prop closed to your agent.
+
+### render_preview
+
+Gives an `EmailPreview`: the email as your users see it now, open Suggestions
+included. `html` is the markup a mail client gets. `text` is the same as plain
+text, so your agent can read its work back.
+
+It does not validate, so a draft with errors still renders.
+
+## What the descriptions say
+
+The descriptions carry the rules your agent gets wrong without them:
+
+- Name Blocks by the ids from `read_email`, never by position.
+- Place a new Block with `after`, `before` or `parent`.
+- Rich text holds only `<strong>`, `<em>`, `<u>`, `<s>`, `<a href>` and
+  `<br>`. Paragraphs and lists only where the prop says so.
+- A colour is `#rgb`, `#rrggbb`, `rgb()` or `rgba()`. A prop that can have no
+  colour takes `"none"`.
+- An image is an Asset, never a URL. An Asset is an image you already resolved:
+  its `src`, `width` and `height`. Give your agent your own image tool that
+  returns them.
+
+`AgentToolDefinition` is one tool: its `name`, `description` and
+`inputSchema`.
+
+## Building your own tools
+
+The parts the tools are made of are public. Use them to write tools of your
+own.
+
+| Name            | What it is                                            |
+| --------------- | ----------------------------------------------------- |
+| `readEmail`     | `read_email`'s result, for an editor and a focus.     |
+| `renderPreview` | `render_preview`'s result, for an editor.             |
+| `plainTextOf`   | Email HTML as plain text. Not for sending.            |
+| `EDIT_SCHEMA`   | One Edit as JSON Schema, for a tool that takes Edits. |
+
+`describeBlocks` and `editor.suggest` come from [`lekh`](/reference/lekh/).
+
+## Everything on this page
+
+All exported from `lekh`:
+
+`agentTools`, `AgentTools`, `AgentToolsOptions`, `AgentToolDefinition`,
+`AgentToolName`, `AgentToolResult`, `readEmail`, `EmailReading`,
+`renderPreview`, `EmailPreview`, `plainTextOf`, `EDIT_SCHEMA`

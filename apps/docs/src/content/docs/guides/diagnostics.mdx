@@ -1,0 +1,210 @@
+---
+title: Show problems and offer one-click fixes
+description: "Surface warnings and errors, and let people repair them."
+---
+
+import { Code } from "@astrojs/starlight/components";
+import panel from "../../../examples/diagnostics-panel.tsx?raw";
+
+## What you'll do
+
+Show people what is wrong with an email, and give them a button that puts it
+right.
+
+## The short version
+
+The library finds problems and describes them. It draws nothing. If you never
+render them, nobody ever sees them.
+
+<Code code={panel} lang="tsx" title="diagnostics-panel.tsx" />
+
+## What a Diagnostic carries
+
+| Field      | Type        | What it is                                                |
+| ---------- | ----------- | --------------------------------------------------------- |
+| `code`     | `string`    | Stable id. Match on this, not the message.                |
+| `message`  | `string`    | Plain-English fallback wording.                           |
+| `severity` | `Severity`  | `"warning"` or `"error"`.                                 |
+| `blockId`  | `string?`   | The Block it concerns, when it concerns one.              |
+| `prop`     | `string?`   | The prop on that Block it concerns, when it concerns one. |
+| `stage`    | `"mobile"?` | Set only when the mobile value alone is wrong.            |
+| `repair`   | `Repair?`   | What would put it right, when anything would.             |
+
+A Stage is the screen size your users are editing: desktop or mobile. When
+`stage` is absent, the finding is about the desktop value, and mobile follows
+it unless it has its own.
+
+Use `code` and write the wording yourself. `message` is there so you are never
+stuck with a blank string, not so you ship it.
+
+## Warnings and errors are different
+
+**A warning** surfaces and nothing more. It never blocks anything.
+
+**An error** stops `renderDocument`. The email cannot be sent while it stands.
+
+That split is deliberate. Somebody halfway through building an email is
+constantly in an invalid state, and an editor that fought them would be
+unusable. The refusal waits until the one moment it matters.
+
+### Raising a severity
+
+```ts
+createEditor({
+  definitions,
+  severities: { "image-alt-text-missing": "error" },
+});
+```
+
+Keyed by code, so it works for findings from Blocks you did not write.
+
+Severity only goes **up**. An error can never be softened into a warning, or
+the render path's refusal would have a back door. If you do not want a rule, do
+not switch it on.
+
+## Repairs
+
+A Repair is **data describing** a change, not the change itself. Validation
+describes repairs everywhere it runs, including on the render path, which
+carries out none of them.
+
+`editor.applyRepair(repair)` is the only thing that performs one.
+
+Two kinds the library describes and can carry out:
+
+```ts
+{ kind: "restore-required-block", type: "unsubscribe" }
+{ kind: "set-prop", blockId, prop, value }
+```
+
+`applyRepair` returns `false` for anything else, which is your signal to carry
+it out yourself.
+
+A repair is one undoable step. Somebody who clicks "Fix it" and changes their
+mind presses ⌘Z once.
+
+### Your own repairs
+
+A Validator you write can attach a repair with any `kind` you like:
+
+```ts
+{ kind: "replace-placeholder", blockId, with: "Acme Inc" }
+```
+
+The library will not recognise it. Handle it in your own click handler, and
+fall back to `applyRepair` for the kinds it does know.
+
+[Write your own checks](/guides/custom-validators/) covers producing findings of
+your own, and the repairs that go with them.
+
+## Where to show problems
+
+Three places, and you probably want all three:
+
+- **A panel**, as above, listing everything at once.
+- **On the Block itself.** The canvas gives you the `blockId`, so you can mark
+  it with your own chrome.
+- **Under the field.** When a finding has a `prop`, show it under that prop's
+  control. Match `blockId` and `prop` against a control's `blockId` and
+  `name`. A finding with `stage: "mobile"` belongs on the mobile control. On
+  desktop, a short line saying mobile has a problem is enough.
+- **On the send button.** Disable it when there is an error, and say why.
+
+```ts
+const blocked = editor.getDiagnostics().some((d) => d.severity === "error");
+```
+
+## Built-in codes
+
+Each entry point keeps its codes on one object. A key is its code in camelCase,
+and a code names its subject first.
+
+| Code                                         | Severity | Means                                           |
+| -------------------------------------------- | -------- | ----------------------------------------------- |
+| `DiagnosticCode.requiredBlockMissing`        | error    | A Required Block was deleted.                   |
+| `DiagnosticCode.blockUnregistered`           | error    | The email holds a type you did not compose.     |
+| `DiagnosticCode.propWrongShape`              | error    | A prop holds the wrong kind of value.           |
+| `DiagnosticCode.urlUnsafe`                   | error    | A link is one an email can't carry.             |
+| `DiagnosticCode.htmlMarkupRemoved`           | warning  | Some hand-written markup will be dropped.       |
+| `DiagnosticCode.htmlMarkupUnbalanced`        | warning  | Hand-written tags do not open and close evenly. |
+| `DiagnosticCode.htmlWholeDocument`           | warning  | Hand-written markup is a whole email.           |
+| `ComplianceDiagnostic.unsubscribeLabelEmpty` | warning  | The opt-out link has no words.                  |
+| `ComplianceDiagnostic.postalAddressEmpty`    | warning  | The address is blank.                           |
+| `ValidatorDiagnostic.fontSizeTooSmall`       | warning  | Only when you switch the check on.              |
+| `ValidatorDiagnostic.contrastTooLow`         | warning  | Only when you switch the check on.              |
+
+The first four always run. `propWrongShape` checks props of the kinds lekh
+names, like `text`, `number` and `asset`, and leaves your own kinds alone. Its
+Repair unsets the prop, back to the default.
+
+`urlUnsafe` flags a `url` prop that holds a link like `javascript:`. It uses the
+same rule that drops the link from the email. Its Repair unsets the prop too.
+
+The three `html` ones run on every prop of the
+`html` kind. The rest depend on what you composed in. The Preset's own codes
+are on `PresetDiagnostic`. See [lekh/blocks](/reference/blocks/#diagnostic-codes).
+
+## Optional checks
+
+Three ship, and none runs unless you ask:
+
+```ts
+import { minimumContrast, minimumFontSize, workingLinks } from "lekh";
+
+createEditor({
+  definitions,
+  validators: [
+    minimumFontSize({ minimum: 14 }),
+    minimumContrast(),
+    workingLinks(),
+  ],
+});
+```
+
+`workingLinks` warns about a link like `https://` with nothing in it, and fixes
+`example.com` and `htps://example.com` to `https://example.com`. It leaves
+`mailto:`, `tel:` and merge tags alone.
+
+`minimumContrast` says nothing at all when it cannot work out what is behind
+the text, such as a gradient, a CSS variable, a partly transparent colour or a
+background image.
+Silence means "could not tell", not "fine".
+
+That is on purpose. A check that guesses produces false warnings, people learn
+to ignore every warning, and the check has made things worse.
+
+See [Validators](/reference/validators/).
+
+## Checks that belong to one Block
+
+Put them on the Block, not in a Validator. A Block Definition takes its own
+`validate` function, and it travels with the Block wherever it is composed.
+
+```ts
+validate: (block) =>
+  isBlank(block.props["href"])
+    ? [{ code: "button-no-link", message: "This button goes nowhere.", severity: "warning" as const, blockId: block.id }]
+    : [],
+```
+
+## Common problems
+
+**No problems ever show up.** You are not rendering them. The library draws
+nothing.
+
+**"Fix it" does nothing.** `applyRepair` returned `false`, because it was a
+repair kind the library does not know. Check the return value.
+
+**Sending throws even though your panel is empty.** Your panel is filtering to
+warnings, or reading a stale list. `renderDocument` runs the same checks the
+editor does.
+
+**A warning you want gone keeps coming back.** Severity cannot be lowered.
+Remove the Validator instead.
+
+## Why it works this way
+
+Editing forgives and sending does not. Everything above follows from that one
+split.
+
+Read [Forgiving editor, strict render](/why/forgiving-editor/).

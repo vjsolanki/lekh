@@ -1,0 +1,60 @@
+---
+/**
+ * The front page.
+ *
+ * A page of its own rather than a Starlight splash: a landing page wants the
+ * whole window, and Starlight puts its banner, title and reading column above
+ * anything in a docs page. Astro bundles CSS per page, so the stylesheet
+ * imported here stays here.
+ *
+ * The page is a drawn editor, six features with a picture and a line each, and
+ * the install line. The pictures are inline SVG, so the page renders on the
+ * server. Only the copy button needs JavaScript.
+ *
+ * Starlight's own routes are a catch-all, so this file wins `/` without any
+ * configuration. There is no `index.mdx` behind it.
+ */
+import Landing from "../components/landing/Landing.tsx";
+// oxlint-disable-next-line import/no-unassigned-import
+import "@fontsource-variable/geist";
+// oxlint-disable-next-line import/no-unassigned-import
+import "@fontsource-variable/geist-mono";
+// oxlint-disable-next-line import/no-unassigned-import
+import "../styles/landing.css";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>lekh: build your own email editor in React</title>
+    <meta
+      name="description"
+      content="lekh does the hard parts of an email editor: drag and drop, undo, AI edits, and checks before an email goes out. You decide how it looks."
+    />
+    <link rel="canonical" href="/" />
+    <script is:inline>
+      // The theme, before the first paint, from the key the docs use, so the
+      // two agree. Nothing stored, or "auto", follows the operating system.
+      (() => {
+        let stored;
+        try {
+          stored = localStorage.getItem("starlight-theme");
+        } catch {
+          // A private window can refuse storage. Fall back to the system.
+        }
+        const theme =
+          stored === "light" || stored === "dark"
+            ? stored
+            : matchMedia("(prefers-color-scheme: dark)").matches
+              ? "dark"
+              : "light";
+        document.documentElement.dataset.theme = theme;
+      })();
+    </script>
+  </head>
+  <body>
+    <Landing client:load />
+  </body>
+</html>

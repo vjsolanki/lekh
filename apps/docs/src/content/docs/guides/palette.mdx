@@ -1,0 +1,266 @@
+---
+title: Build a palette
+description: "Give people a list of Blocks they can drag onto the canvas."
+---
+
+import { Code } from "@astrojs/starlight/components";
+import grouped from "../../../examples/palette-grouped.tsx?raw";
+import dropTargets from "../../../examples/drop-targets.tsx?raw";
+
+## What you'll do
+
+Build the list of Blocks somebody drags from, grouped and styled however you
+like.
+
+## The short version
+
+Two hooks. `usePalette` gives you the list; `usePaletteDrag` makes one entry
+draggable. You draw everything.
+
+```tsx
+function PaletteButton({ entry }: { entry: PaletteEntry }) {
+  const { dragHandleProps } = usePaletteDrag(entry.type);
+  return <button {...dragHandleProps}>{entry.label}</button>;
+}
+```
+
+Spread `dragHandleProps` onto whatever should start the drag. It carries no
+styling and no drag-library types, so it fits a button you already have.
+
+## Put it inside the provider
+
+`EditorProvider` must wrap **both** the palette and the canvas. A drag starts
+in one and finishes in the other.
+
+```tsx
+<EditorProvider editor={editor}>
+  <Palette />
+  <Canvas />
+</EditorProvider>
+```
+
+They can be anywhere in your layout, as long as both are inside it.
+
+## Grouping and filtering
+
+`usePalette` returns what you composed, in that order, **including the root
+type**. Only one thing is left out: a Block that is part of another Block's
+shape instead of something to drag in.
+
+A column inside a row is the shipped example. The row makes its own columns,
+someone adds another through the row instead of from the palette, and clicking
+one selects the row. Its Definition has said it works that way, so the list
+obeys it.
+
+Nothing else is removed. The library never filters by taste, and the root type
+is an ordinary Definition you might have a reason to list. So dropping the root
+is yours to do, and you should at least do that much.
+
+<Code code={grouped} lang="tsx" title="palette-grouped.tsx" />
+
+Notice the group list is filtered against what is actually registered. Hard-code
+`"unsubscribe"` in a group and an editor without the compliance Preset would
+show a button that inserts nothing.
+
+A Block kept out of the palette still has to be reachable somehow.
+`editor.getAddableChildren()` is that route. It reads the current selection and
+returns an `add` for each child only that Block can make, so an "Add column"
+button belongs next to the selected row's props. See
+[`lekh`](/reference/lekh/).
+
+## Clicking as well as dragging
+
+Dragging is not the only way in, and it is a poor one on a touchscreen or with
+a keyboard.
+
+```ts
+const outcome = editor.place({ reason: "insert", type });
+```
+
+A clicked entry lands after the selected Block, or at the end, and is scrolled
+into view. A dragged one lands where it was dropped, and the view stays put,
+since they are already looking at the place they chose.
+
+`place` returns one of three things:
+
+| Status        | Means                                                |
+| ------------- | ---------------------------------------------------- |
+| `"inserted"`  | It is in the email. `blockId` tells you which.       |
+| `"requested"` | An image was asked for. Nothing is in the email yet. |
+| `"refused"`   | Nothing happened, and no undo step was recorded.     |
+
+Handle `"refused"` instead of assuming success. The usual cause is that nothing
+accepts the type.
+
+## Disabling what will not fit
+
+```ts
+const allowed = editor.canInsert(type, parentId);
+```
+
+Grey an entry out instead of letting somebody drag it somewhere it cannot go.
+
+The rules come from your Definitions: `accepts` says which types a container
+takes, `maxChildren` caps how many.
+
+## Showing where it will land
+
+The canvas already resolves this. Fill the `dropIndicator` slot and draw
+whatever you like at the rectangle it hands you:
+
+```tsx
+<Canvas slots={{ dropIndicator: MyDropLine }} />
+```
+
+The rectangle is already in the canvas's coordinate space.
+
+It is flat along the parent's layout axis: an insertion between stacked Blocks
+has zero height, and one between Blocks sharing a row has zero width. Read
+`target.axis`, which is `"vertical"` or `"horizontal"`, to know which way round
+to give your line its thickness:
+
+```tsx
+function MyDropLine({ target, rect }: DropIndicatorProps) {
+  const across = target.axis === "horizontal";
+  return (
+    <div
+      style={{
+        position: "absolute",
+        ...rect,
+        [across ? "minWidth" : "minHeight"]: 2,
+        background: "hotpink",
+      }}
+    />
+  );
+}
+```
+
+A drop into a container with nothing in it yet covers the whole container, and
+`target.position` is `"inside"`.
+
+You are also told what is being carried. That matters because by the time
+somebody is halfway through a drag, the thing they picked up is under their
+cursor and out of the palette.
+
+```tsx
+function MyDropLine({ dragged, rect }: DropIndicatorProps) {
+  // `blockId` is there when a Block already in the email is moving, and
+  // absent when a new one is being added.
+  const verb = dragged.blockId === undefined ? "Add" : "Move";
+  return <div>{`${verb} ${dragged.type} here`}</div>;
+}
+```
+
+## Showing every place it could land
+
+Fill the `dropTarget` slot to show every place the Block may land, from the
+moment the drag starts. Your users see where they can drop before they aim. It
+is drawn once per place, with the same props as `dropIndicator` plus `current`:
+
+<Code code={dropTargets} lang="tsx" title="drop-targets.tsx" />
+
+The places come from `editor.getDropTargets`, which uses the same rules as
+resolving a drop. So you never show a place where a drop would be refused.
+
+While a drag is in flight the canvas stops asking for the `selection`, `hover`
+and `textToolbar` slots. An outline around the Block being carried competes
+with the one mark that says where it lands. They come back when the drag ends.
+
+## The Block in the air
+
+A Block being dragged does not move. It stays exactly where it was until the
+drop lands, so two more slots describe the same gesture: one under the pointer,
+one over the Block that has not gone anywhere yet.
+
+`dragPreview` is what follows the cursor. It receives `{ block }`, the same
+`DraggedBlock` the indicator gets:
+
+```tsx
+function MyPreview({ block }: DragPreviewProps) {
+  const editor = useEditor();
+  return <div>{editor.getDefinition(block.type)?.label ?? block.type}</div>;
+}
+```
+
+It renders **in your document**, not inside the frame, so your stylesheet and
+utility classes reach it exactly as they would anywhere else. The canvas puts
+its top-left corner on the pointer and gives it no size. Move it off the
+pointer with your own CSS, so it doesn't cover the drop indicator your users
+are aiming with:
+
+```tsx
+<div style={{ position: "absolute", left: 16, top: 8 }}>…</div>
+```
+
+What it cannot do is show the Block's real appearance. That lives in the
+email's own stylesheet, inside the frame. Keep it small: a label that says
+which Block is moving. `draggingBlock` already shows the Block's real size,
+where it sits.
+
+`draggingBlock` is the other half — drawn over the Block where it still sits,
+saying this one is leaving:
+
+```tsx
+function MyDraggingBlock({ rect }: BlockChromeProps) {
+  return (
+    <div
+      style={{
+        position: "absolute",
+        ...rect,
+        background: "rgb(255 255 255 / 70%)",
+        outline: "1px dashed #c7d2fe",
+        pointerEvents: "none",
+      }}
+    />
+  );
+}
+```
+
+It covers rather than fades. The Block is inside the frame and this is outside
+it, so a translucent scrim in your page's own background colour is what stands
+in for dimming it. Nothing at all is drawn without this slot, and a move then
+looks identical to a copy until the drop lands.
+
+`dragPreview` has a default — a small label naming the type — because a
+Block carried with nothing under the pointer looks broken. `draggingBlock` has
+none, because a Block that merely sits still does not.
+
+Neither slot is involved when the drag started in your palette. That gesture
+lifts your own palette entry, in your own markup, already wearing your own
+styles, so there is nothing for a preview to improve on.
+
+## Dragging files in
+
+Files dropped onto the canvas become the first Block with a prop of kind
+`asset`. Ask which one that is:
+
+```ts
+const imageType = editor.getImageBlockType();
+```
+
+It returns `undefined` when there is no such Block, or when you supplied no
+`resolveImage`. Either way the dropped file is left to the browser instead of
+being swallowed. See [Handle images and uploads](/guides/images/).
+
+## Common problems
+
+**Dragging does nothing.** The palette is outside `EditorProvider`.
+
+**The root type shows up in the list.** Filter it. The library will not.
+
+**An entry inserts nothing.** That type is not composed into this editor. Check
+against `usePalette` rather than hard-coding.
+
+**Drops are refused everywhere.** No container's `accepts` includes the type,
+or every candidate is at `maxChildren`.
+
+**The drag looks wrong on touch.** You spread `dragHandleProps` onto a wrapper
+instead of the element people actually press.
+
+## Why it works this way
+
+A palette is one of the most product-specific parts of an editor. Icons,
+grouping, search, permissions: all of it differs per product. Handing you data
+instead of a component is what lets it look like yours.
+
+Read [Headless by design](/why/headless/).

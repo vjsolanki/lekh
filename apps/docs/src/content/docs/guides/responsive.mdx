@@ -1,0 +1,234 @@
+---
+title: Make emails work on phones
+description: "Stack columns, hide or show Blocks, and change a value just on mobile."
+---
+
+import { Code } from "@astrojs/starlight/components";
+import responsive from "../../../examples/responsive-block.tsx?raw";
+
+## What you'll do
+
+Make an email readable on a phone: stack the columns, hide what does not fit,
+and shrink the headline.
+
+## The short version
+
+Two different jobs, and they work differently because they cost differently.
+
+**Stacking and hiding** is an ordinary boolean prop. Ask for a class by name.
+
+**A phone-only value**, such as a headline at 24px instead of 40, is opted in
+per prop by saying what the value becomes in CSS.
+
+<Code code={responsive} lang="tsx" title="responsive-block.tsx" />
+
+Then render the toggle. The library gives you the state; you draw the button.
+
+```tsx
+<button onClick={() => editor.setStage("mobile")}>Mobile</button>
+```
+
+## Stacking and hiding
+
+Two classes ship: `stack` and `hide`. Ask for one by name and the root emits
+the single rule behind it.
+
+```tsx
+className={classNames(props.stackOnMobile && mobile.use("stack"))}
+```
+
+**Only call `use` when you want the class.** Calling it is what marks the rule
+as needed. Call it unconditionally and you emit CSS nobody uses.
+
+Both are element-local, so any Block can ask for either whatever it renders.
+
+`classNames` joins what is present and returns `undefined` when nothing is,
+which keeps an empty `class=""` out of the markup.
+
+## Show a Block only on a phone
+
+Hand everything the Block renders to `mobile.only`:
+
+```tsx
+return props.showOn === "mobile" ? mobile.only(banner) : banner;
+```
+
+It comes back inside a `<div>` that is hidden inline and shown by a rule in the
+media query. In the sent email its markup also sits inside an `<!--[if !mso]>`
+comment, so Outlook on the desktop never shows it. On the Canvas it stays live,
+so your users can still select and edit what is inside.
+
+**Only call `only` when the Block is mobile-only.** As with `use`, calling it is
+what puts the rule in the stylesheet.
+
+Use `mobile.use("hide")` for the opposite: a Block shown everywhere but a phone.
+That is one class on any element. `only` needs a wrapper, because the reveal
+has to set `display` back, and the right value depends on the element.
+
+**Mobile-only content is not seen where a mail client strips styles.** That
+includes the Gmail app reading a non-Google account, and an email whose
+stylesheet gets clipped. Those readers get the desktop email. So never make
+mobile-only content the only copy of something. Pair it with a desktop-only
+copy.
+
+Do not use it on a table cell. A `<div>` cannot wrap a `<td>`.
+
+## Behaviour that needs the markup around it
+
+Reversing the order of a row's columns needs the element whose children those
+columns are. No fixed class can do that, so the Block that owns the markup
+emits its own rule:
+
+```tsx
+mobile.add(
+  ".my-row>tbody>tr{display:flex!important;flex-direction:column-reverse!important}",
+);
+```
+
+What you add goes straight into the same media query. Write the `!important`
+yourself here. The library only adds it to phone-only values.
+
+## Phone-only values
+
+A prop opts in by saying what its value becomes in CSS:
+
+```ts
+fontSize: {
+  kind: "number",
+  label: "Font size",
+  defaultValue: 28,
+  mobile: (size) => ({ "font-size": `${size}px` }),
+},
+```
+
+Now somebody on the mobile Stage can set a font size that applies only there.
+
+`mobile` also gets the root's props as a second argument. Use it when a value
+means something different in a different email. The shipped alignment reads the
+email's `direction` there, so `start` is written as `right` in a right-to-left
+email.
+
+Each one needs a generated class and a forced rule, which is why it is opt-in
+instead of automatic. Realistically it is worth it for font size, padding and
+alignment. Anything else is usually a colour or a width Outlook ignores.
+
+**Only opted-in props appear on the mobile Stage**, so nobody is offered a
+change that would emit nothing.
+
+Put `mobile.className` on the same element whose inline styles the override has
+to beat. Put it elsewhere and the rule is emitted but loses.
+
+## How they are stored
+
+Sparsely, in a `mobile` object on the Block, holding only what was explicitly
+changed.
+
+An absent key follows the desktop value, so changing desktop still moves
+mobile. Reverting deletes the key instead of writing a copy.
+
+```json
+{ "props": { "fontSize": 40 }, "mobile": { "fontSize": 24 } }
+```
+
+Setting a value while on the mobile Stage writes an override. Both that and
+clearing it are ordinary undoable steps.
+
+## The Stage
+
+The Stage lives on the editor, so the canvas and the inspector can never
+disagree about which one is showing.
+
+```ts
+editor.getStage(); // "desktop" | "mobile"
+editor.setStage("mobile");
+```
+
+Switching narrows the canvas frame to `mobileWidth` (375 by default), so the
+email's **own media queries genuinely fire**. It is the rendering a phone would
+get, not an impression of one.
+
+A product that does not want the concept never renders a toggle, and nothing
+about phone-only values ever surfaces.
+
+Open on mobile instead:
+
+```ts
+createEditor({ definitions, rootType, stage: "mobile" });
+```
+
+## In the inspector
+
+Each control reports `overridable`, whether the prop can have a phone-only
+value. On mobile, `origin` is `"override"` when it has one.
+
+`otherStage` holds the other Stage's `value` and `origin`, so each Stage can
+name the other's. `clearOverride` reverts.
+
+```tsx
+{
+  control.origin === "override" && (
+    <button type="button" onClick={control.clearOverride}>
+      Use desktop, {String(control.otherStage?.value)}
+    </button>
+  );
+}
+```
+
+On desktop, `otherStage?.origin === "override"` means mobile differs. Worth
+saying: it is where somebody finds out a prop has a phone life at all.
+
+## Emit the stylesheet
+
+The root Block emits it, once, in the head:
+
+```tsx
+<MobileStyles css={mobile.stylesheet()} />
+```
+
+It renders nothing at all when the email uses none of it, so a simple email
+carries no stylesheet.
+
+A Block renders before its parent, so by the time the root renders, everything
+that asked for a rule has asked.
+
+## Why email makes this harder than the web
+
+Inline styles are the baseline, because mail clients strip stylesheets. An
+inline style beats a stylesheet rule, so any phone-only value has to be forced
+with `!important`. The library adds that for you.
+
+Outlook on the desktop ignores media queries entirely. That is survivable only
+because it is always a wide window, which is also why the phone rules live in a
+media query instead of being the default.
+
+The breakpoint is 480px.
+
+## Common problems
+
+**The stylesheet is empty.** Your root does not render `<MobileStyles>`, or no
+Block asked for anything.
+
+**A phone-only value does nothing.** `mobile.className` is on the wrong
+element. It must be the one carrying the inline style it has to beat.
+
+**A prop does not appear on the mobile Stage.** It has no `mobile` function.
+That is the opt-in.
+
+**The mobile preview looks nothing like a phone.** Check `mobileWidth`, and
+remember the frame really is that wide. If it looks wrong here, a real phone
+would look wrong too.
+
+**Reversed columns do not reverse.** You used `mobile.use`, which only has
+`stack` and `hide`. Use `mobile.add` with your own rule.
+
+**Everything stacks even on desktop.** You called `mobile.use("stack")`
+unconditionally.
+
+## Why it works this way
+
+Splitting the two halves is the whole design. Stacking costs one fixed class
+that any Block can share; a phone-only value costs a generated class and a
+forced rule per prop. Charging both the same price would mean either paying too
+much for stacking or making overrides automatic and expensive.
+
+Read [Headless by design](/why/headless/).

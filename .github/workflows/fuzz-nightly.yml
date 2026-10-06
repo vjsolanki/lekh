@@ -1,0 +1,61 @@
+name: Nightly fuzz
+
+# The fuzz test runs 100 random sequences on every push. This runs 5000, to
+# find the rare orders, and files an issue with the seed and the shrunk steps
+# when one breaks a rule. Every failure becomes a named example test.
+
+on:
+  schedule:
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  fuzz:
+    name: Fuzz (5000 runs)
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Run the fuzz test
+        id: fuzz
+        env:
+          LEKH_FUZZ_RUNS: "5000"
+          NO_COLOR: "1"
+        run: |
+          set -o pipefail
+          pnpm --filter lekh exec vitest run --project node src/core/editor/fuzz.test.ts 2>&1 | tee fuzz.log
+      - name: File an issue
+        # Only when the fuzz test failed, not when the install did.
+        if: failure() && steps.fuzz.outcome == 'failure'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          title="Nightly fuzz failure"
+          {
+            echo "The nightly fuzz run broke a rule: $RUN_URL"
+            echo
+            echo "Replay it with \`LEKH_FUZZ_SEED\` and \`LEKH_FUZZ_PATH\` from below. Then turn the shrunk steps into a named example test in \`src/core/editor/fuzz.test.ts\`."
+            echo
+            echo '```'
+            # From each failed property down to the rule it broke: the seed,
+            # the path, the shrunk steps and what each resolved to.
+            sed -n '/FAIL .*fuzz.test.ts/,/^Caused by: AssertionError/p' fuzz.log | head -n 1000
+            echo '```'
+          } > body.md
+          existing=$(gh issue list --state open --search "\"$title\" in:title" --json number --jq '.[0].number')
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body-file body.md
+          else
+            gh issue create --title "$title" --body-file body.md
+          fi

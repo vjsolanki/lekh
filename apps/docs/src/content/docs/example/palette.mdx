@@ -1,0 +1,66 @@
+---
+title: "The example: the palette"
+description: "How the example groups Blocks, and why the grouping is not the library's."
+---
+
+`src/components/editor/palette.tsx`.
+
+## What the library gave it
+
+Two hooks and one method.
+
+| From the library         | What it answers                                   |
+| ------------------------ | ------------------------------------------------- |
+| `usePalette()`           | Every Definition that is not structural.          |
+| `usePaletteDrag(type)`   | `dragHandleProps` and `isDragging` for one entry. |
+| `editor.getDefinition()` | The Definition behind an entry, for its flags.    |
+| `editor.place(intent)`   | Insert without a drag, for a click.               |
+
+That is the whole of it. `usePalette` returns `{ type, label }` and nothing
+else — no icon, no group, no description, no order beyond the order you
+composed the Definitions in.
+
+## What had to be written
+
+**The groups.** Layout, Content and Compliance are the example's idea, not the
+library's. There is no `group` field on a Block Definition, so the example
+derives them: a Definition with `required: true` is compliance, a Definition
+with `accepts` is layout, everything else is content.
+
+The whole derivation is about fifteen lines, and it is worth understanding why
+it is yours.
+A palette grouping is a product decision that changes with your audience. A
+library field would have frozen one answer into every editor built on it, and
+the first person who wanted "Marketing" and "Transactional" instead would have
+been stuck.
+
+**The icons.** `usePalette` gives you a label. Everything visual is a map from
+`type` to your own icon set.
+
+**Click as well as drag.** Dragging is not available to everyone, and it is not
+always the fastest way. The example makes each entry clickable, which calls
+`place` with an intent rather than a resolved target — the library then decides
+where it goes, based on what is selected.
+
+**The disabled state.** An entry that cannot go anywhere useful right now is
+dimmed rather than removed, because a palette that changes size as you select
+things is disorientating.
+
+## Worth stealing
+
+The `dragHandleProps` spread carries no styling and no drag-library types. It
+goes onto whatever element you already have:
+
+```tsx
+<button type="button" {...dragHandleProps}>
+```
+
+So the palette entry stays your component. There is no wrapper to fight, no
+`as` prop, and nothing to override.
+
+## Worth knowing before you copy it
+
+`usePalette` filters structural Definitions out for you, but not the root. The
+root is an ordinary Block and nobody drags one, so filter it by `rootType`.
+
+See [Build a palette](/guides/palette/) for the guide version.

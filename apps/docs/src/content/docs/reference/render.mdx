@@ -1,0 +1,156 @@
+---
+title: Render
+description: "Turn a saved email into HTML you can send."
+---
+
+import { Code } from "@astrojs/starlight/components";
+import basic from "../../../examples/render-to-html.tsx?raw";
+import preview from "../../../examples/render-preview.tsx?raw";
+import failure from "../../../examples/render-handle-failure.tsx?raw";
+import clip from "../../../examples/clip-check.ts?raw";
+
+Turns a Document, the JSON tree that holds an email, into HTML.
+
+Everything on this page comes from `lekh`. Import only these in a send job or
+a Server Component, and your bundler leaves the editor out.
+[Render an email on a server](/guides/server-rendering/) has the details.
+
+## Import
+
+```ts
+import { renderDocument, toHtml } from "lekh";
+```
+
+<Code code={basic} lang="tsx" title="render-to-html.tsx" />
+
+## renderDocument
+
+```ts
+function renderDocument(
+  document: EmailDocument,
+  options: RenderDocumentOptions,
+): ReactElement;
+```
+
+Turns a Document into a React element and stops there. It does not produce a
+string, so you can use any stringifier you like. Use [`toHtml`](#tohtml) if you
+have no preference.
+
+Before rendering, it brings old Blocks up to date using the migrations in your
+Block Definitions. You always render the current shape, whatever version was
+saved.
+
+### Options
+
+| Option        | Type                | Default | What it does                                                    |
+| ------------- | ------------------- | ------- | --------------------------------------------------------------- |
+| `definitions` | `BlockDefinition[]` | —       | Required. How each type of Block draws itself.                  |
+| `validate`    | `boolean`           | `true`  | Check the Document first, and throw if anything is wrong.       |
+| `validators`  | `Validator[]`       | `[]`    | Extra checks of your own, on top of the built-in ones.          |
+| `severities`  | `SeverityOverrides` | `{}`    | Promote a warning to an error, or demote an error, by its code. |
+
+### Throws
+
+`UnknownBlockError` when the Document contains a Block whose type is not in
+`definitions`. This throws even when `validate` is `false`, because there is no
+way to draw the Block at all.
+
+`DocumentValidationError` when the Document has at least one error-severity
+Diagnostic, such as a missing unsubscribe link. Only thrown when `validate` is
+`true`.
+
+Both are deliberate. A send job that stops is better than fifty thousand people
+receiving an email with a hole in it.
+
+### Preview a half-finished email
+
+Someone editing an email will have it in a broken state most of the time. Pass
+`validate: false` so a preview still draws.
+
+<Code code={preview} lang="tsx" title="render-preview.tsx" />
+
+Never use `validate: false` on the path that actually sends. It is the one
+place the checks can be relied on.
+
+## toHtml
+
+```ts
+function toHtml(element: ReactElement, options?: ToHtmlOptions): string;
+```
+
+Turns the element from `renderDocument` into an HTML string. It uses
+`renderToStaticMarkup`, so the output has no React hydration markers. Mail
+clients get plain HTML.
+
+### Options
+
+| Option    | Type      | Default | What it does                                    |
+| --------- | --------- | ------- | ----------------------------------------------- |
+| `doctype` | `boolean` | `true`  | Add the XHTML doctype that mail clients expect. |
+
+Keep `doctype: true` for anything you send. Turn it off when you are putting
+the markup inside a page you already control, such as a preview pane.
+
+## clipCheck
+
+```ts
+function clipCheck(html: string, options?: ClipCheckOptions): ClipCheck;
+```
+
+Throws a `RangeError` when `headroom` is below 0 or above 1.
+
+Says how close an email is to Gmail's clip. Past roughly 102 KB, Gmail hides
+the rest of the email behind a "View entire message" link. Your unsubscribe
+link and tracking pixel go with it.
+
+<Code code={clip} lang="ts" title="clip-check.ts" />
+
+Pass the final HTML, after your send pipeline adds tracking, a footer or
+inlined CSS. That is why this is not a Diagnostic: the Document alone can't
+say how big the sent email will be.
+
+### Options
+
+| Option     | Type     | Default            | What it does                                            |
+| ---------- | -------- | ------------------ | ------------------------------------------------------- |
+| `limit`    | `number` | `GMAIL_CLIP_BYTES` | The size in bytes past which the email is clipped.      |
+| `headroom` | `number` | `0.1`              | The share of the limit to keep free. Inside it is near. |
+
+### ClipCheck
+
+| Property | Type                              | What it is                                                     |
+| -------- | --------------------------------- | -------------------------------------------------------------- |
+| `bytes`  | `number`                          | The HTML's size in UTF-8 bytes, which is what Gmail counts.    |
+| `limit`  | `number`                          | The limit it was measured against.                             |
+| `risk`   | `"ok"` \| `"near"` \| `"clipped"` | `near` once it is inside the headroom, `clipped` past `limit`. |
+
+`GMAIL_CLIP_BYTES` is the default limit, 102 × 1024 bytes. `clipCheck` is on
+[`lekh`](/reference/lekh/) too, so an editor can show the size as people work.
+
+## Errors
+
+### UnknownBlockError
+
+| Property    | Type     | What it is                             |
+| ----------- | -------- | -------------------------------------- |
+| `blockId`   | `string` | The Block that could not be drawn.     |
+| `blockType` | `string` | The type that has no Block Definition. |
+
+### DocumentValidationError
+
+| Property      | Type           | What it is                                                     |
+| ------------- | -------------- | -------------------------------------------------------------- |
+| `diagnostics` | `Diagnostic[]` | Everything found, warnings included, not only what stopped it. |
+
+`diagnostics` holds warnings as well as errors, so filter by `severity` when
+you report them.
+
+<Code code={failure} lang="tsx" title="render-handle-failure.tsx" />
+
+## Why it works this way
+
+Rendering is the only way out of the library, so it is the only place a promise
+about the finished email can be kept. That is why it refuses instead of
+patching over a problem.
+
+Read [Forgiving editor, strict render](/why/forgiving-editor/).

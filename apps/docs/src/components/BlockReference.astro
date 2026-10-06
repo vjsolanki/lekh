@@ -1,0 +1,75 @@
+---
+/**
+ * A table per Block Definition, read from the Definitions at build time.
+ *
+ * Nothing here is typed by hand, so the reference cannot drift from the code:
+ * a prop added to a Schema is a row on the next build. The words around the
+ * tables stay in the page, which is where the reasons live.
+ *
+ * Each Block gets an `h3` with the id `block-<type>`, so prose elsewhere on
+ * the page can link to its table.
+ */
+import type { BlockDefinition } from "lekh";
+
+import { describeBlocks } from "../lib/block-reference";
+import InlineParts from "./InlineParts.astro";
+
+interface Props {
+  readonly definitions: readonly BlockDefinition[];
+}
+
+const blocks = describeBlocks(Astro.props.definitions);
+---
+
+{
+  blocks.map((block) => (
+    <>
+      <h3 id={`block-${block.type}`}>
+        <code>{block.type}</code>
+      </h3>
+      <p>
+        {block.label}, version {block.version}.{" "}
+        {block.props.length === 0 ? "No props. " : ""}
+        <InlineParts inline={block.holds} />
+      </p>
+      {block.props.length > 0 && (
+        <table>
+          <thead>
+            <tr>
+              <th>Prop</th>
+              <th>What it is</th>
+              <th>Kind</th>
+              <th>Default</th>
+              <th>Constraints</th>
+              <th>Phone-only value</th>
+            </tr>
+          </thead>
+          <tbody>
+            {block.props.map((row) => (
+              <tr>
+                <td>
+                  <code>{row.name}</code>
+                </td>
+                <td>{row.label}</td>
+                <td>
+                  <code>{row.kind}</code>
+                </td>
+                <td>
+                  <InlineParts inline={row.defaultValue} />
+                </td>
+                <td>
+                  {row.constraints.length === 0 ? (
+                    "—"
+                  ) : (
+                    <InlineParts inline={row.constraints} />
+                  )}
+                </td>
+                <td>{row.overridable ? "yes" : "no"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </>
+  ))
+}

@@ -1,0 +1,67 @@
+---
+title: "The example: the outline"
+description: "A tree walked straight from the Document, and why selecting a column selects the row."
+---
+
+`src/components/editor/outline.tsx`.
+
+## What the library gave it
+
+| From the library         | What it answers                                |
+| ------------------------ | ---------------------------------------------- |
+| `getDocument()`          | The whole tree, as plain JSON.                 |
+| `getDefinition(type)`    | The label to show for a node.                  |
+| `getSelection()`         | Which Block is selected now.                   |
+| `getSelectable(blockId)` | Which Block a click on this one should select. |
+| `select(blockId)`        | Select it.                                     |
+| `reveal(blockId)`        | Ask for it to be brought on screen.            |
+
+There is no tree component and no outline API. A Document is JSON with
+`children` arrays, so the outline is ordinary recursion over it.
+
+## The one that is easy to get wrong
+
+`getSelectable` is the interesting call, and skipping it produces a subtly
+broken panel.
+
+A column is structural: it exists, it renders, it has props, but it is not
+something anybody reaches for directly. Clicking a column should select the row
+that owns it. `getSelectable(columnId)` returns the row's id, so the outline
+does not have to know what structural means, or which of your types are.
+
+```ts
+editor.select(editor.getSelectable(node.id));
+```
+
+Write `editor.select(node.id)` instead and you get an outline that can select
+Blocks the canvas cannot, and a selected state the inspector will not describe.
+
+## Reveal is an announcement, not a scroll
+
+`reveal` says a Block should be brought into view, and the canvas does it:
+
+```ts
+editor.reveal(blockId);
+```
+
+There is nothing to subscribe to and no scrolling to write. The canvas has a
+measured rectangle for every Block and finds whichever element holds the
+overflow — yours, or the one it made from a `height`. Getting this right by hand
+means scroll arithmetic across a document boundary, so it is not left to you.
+
+This is also what makes a Diagnostic clickable. The status bar calls `select`
+and `reveal`, and the Block lands on screen.
+
+## What had to be written
+
+**Expand and collapse.** Local component state. The library has no idea your
+tree has a disclosure triangle.
+
+**What each row shows.** The example shows the Definition's label, a badge for
+Required Blocks, and dims Blocks hidden on the current Stage.
+
+**Everything about the rendering.** Indentation, keyboard navigation, drag
+affordances. A Document is data; a tree view is a product.
+
+See [Subscribe to changes efficiently](/guides/subscribing/) for keeping this
+cheap on a large email.

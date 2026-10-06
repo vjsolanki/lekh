@@ -1,0 +1,699 @@
+/*
+ * The docs site's stylesheet.
+ *
+ * The docs share the landing page's look: a grass green accent, Geist for all
+ * text, Geist Mono for code, and neutral greys. Every colour here is copied
+ * from `styles/landing.css` rather than picked again, so the two can't drift.
+ * If you change one, change the other.
+ *
+ * Loaded through Starlight's `customCss`, which imports it before Starlight's
+ * own layers. Nothing here is in a layer, so these rules win without `!important`.
+ */
+
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/geist-mono";
+
+/*
+ * Dark first, because Starlight defines dark on `:root` and light under the
+ * attribute. Following its order keeps the two sets of tokens from fighting.
+ */
+:root,
+::backdrop {
+  /* Grounds. `sidebar` is the sunk rail; `bg` is the page. */
+  --sl-color-bg: #0e100d;
+  --sl-color-bg-nav: #0e100d;
+  --sl-color-bg-sidebar: #141712;
+  --sl-color-bg-inline-code: #141712;
+
+  /* Grey ramp, ink down to the deepest ground. */
+  --sl-color-white: #ecefe9;
+  --sl-color-gray-1: #dde1da;
+  --sl-color-gray-2: #c3c8bf;
+  --sl-color-gray-3: #8d9389;
+  --sl-color-gray-4: #6b7167;
+  --sl-color-gray-5: #3a3f37;
+  --sl-color-gray-6: #262a24;
+  --sl-color-gray-7: #181b16;
+  --sl-color-black: #0a0b09;
+
+  /* The accent. `bg-accent` and `text-invert` are the filled button. */
+  --sl-color-accent: #3fb862;
+  --sl-color-accent-low: #13301c;
+  --sl-color-accent-high: #6fd68b;
+  --sl-color-text-accent: #6fd68b;
+  --sl-color-text-invert: #08160c;
+  --sl-color-bg-accent: #3fb862;
+  --docs-button-hover: #5cc77a;
+
+  --sl-color-hairline: #262a24;
+  --sl-color-hairline-light: #3a3f37;
+  --sl-color-hairline-shade: #0a0b09;
+  --sl-color-backdrop-overlay: rgb(6 8 5 / 70%);
+
+  /* Aside colours. Purple is the green note, orange is a warning, red is an
+     error, blue is plain information. */
+  --sl-color-blue: #8fb8e8;
+  --sl-color-blue-low: #1b2330;
+  --sl-color-blue-high: #bcd6f4;
+  --sl-color-purple: #3fb862;
+  --sl-color-purple-low: #13301c;
+  --sl-color-purple-high: #6fd68b;
+  --sl-color-orange: #f0b44a;
+  --sl-color-orange-low: #2c220f;
+  --sl-color-orange-high: #f6cf85;
+  --sl-color-red: #ff8a80;
+  --sl-color-red-low: #2f1614;
+  --sl-color-red-high: #ffb3ab;
+
+  /* The faint grey used for small labels, carets and list markers. */
+  --docs-crop: #8d9389;
+
+  --sl-shadow-sm: 0 1px 2px rgb(0 0 0 / 25%);
+  --sl-shadow-md: 0 8px 20px -12px rgb(0 0 0 / 45%);
+  --sl-shadow-lg: 0 24px 48px -24px rgb(0 0 0 / 55%);
+
+  /* Geist for everything, Geist Mono for code. Titles are the same face. */
+  --sl-font:
+    "Geist Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica,
+    Arial, sans-serif;
+  --sl-font-mono:
+    "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, Consolas,
+    monospace;
+  --docs-font-display: var(--sl-font);
+
+  --sl-text-h1: 2.375rem;
+  --sl-text-h2: 1.4375rem;
+  --sl-text-h3: 1.125rem;
+  --sl-text-h4: 1rem;
+  --sl-line-height: 1.7;
+  --sl-line-height-headings: 1.2;
+
+  --sl-content-width: 46rem;
+  --sl-sidebar-width: 17.5rem;
+  --sl-nav-height: 3.25rem;
+
+  /* One easing curve for every transition. Fast out, slow in. */
+  --docs-ease: cubic-bezier(0.2, 0, 0, 1);
+
+  color-scheme: dark;
+}
+
+:root[data-theme="light"],
+[data-theme="light"] ::backdrop {
+  --sl-color-bg: #ffffff;
+  --sl-color-bg-nav: #ffffff;
+  --sl-color-bg-sidebar: #f4f5f2;
+  --sl-color-bg-inline-code: #f4f5f2;
+
+  --sl-color-white: #141613;
+  --sl-color-gray-1: #262923;
+  --sl-color-gray-2: #393d36;
+  --sl-color-gray-3: #676c63;
+  --sl-color-gray-4: #8d9389;
+  --sl-color-gray-5: #cdd1c8;
+  --sl-color-gray-6: #e6e8e3;
+  --sl-color-gray-7: #f4f5f2;
+  --sl-color-black: #ffffff;
+
+  --sl-color-accent: #2ea44f;
+  --sl-color-accent-low: #e7f5ea;
+  --sl-color-accent-high: #136b30;
+  --sl-color-text-accent: #18803a;
+  --sl-color-text-invert: #ffffff;
+  --sl-color-bg-accent: #18803a;
+  --docs-button-hover: #136b30;
+
+  --sl-color-hairline: #e6e8e3;
+  --sl-color-hairline-light: #cdd1c8;
+  --sl-color-hairline-shade: #e6e8e3;
+  --sl-color-backdrop-overlay: rgb(20 22 19 / 45%);
+
+  --sl-color-blue: #2f5d99;
+  --sl-color-blue-low: #e7eef8;
+  --sl-color-blue-high: #1e3f6b;
+  --sl-color-purple: #2ea44f;
+  --sl-color-purple-low: #e7f5ea;
+  --sl-color-purple-high: #18803a;
+  --sl-color-orange: #b45309;
+  --sl-color-orange-low: #fef3e2;
+  --sl-color-orange-high: #8a3f06;
+  --sl-color-red: #b42318;
+  --sl-color-red-low: #fdecea;
+  --sl-color-red-high: #8c1a12;
+
+  --docs-crop: #676c63;
+
+  --sl-shadow-sm: 0 1px 2px rgb(20 22 19 / 5%);
+  --sl-shadow-md: 0 8px 20px -14px rgb(20 22 19 / 18%);
+  --sl-shadow-lg: 0 24px 48px -28px rgb(20 22 19 / 22%);
+
+  color-scheme: light;
+}
+
+@media (min-width: 50em) {
+  :root {
+    --sl-nav-height: 3.75rem;
+    --sl-text-h1: 3.25rem;
+    --sl-text-h2: 1.625rem;
+    --sl-text-h3: 1.1875rem;
+    --sl-text-h4: 1.0625rem;
+  }
+}
+
+body {
+  font-family: var(--sl-font);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* Selected text sits on the green wash. */
+::selection {
+  background-color: var(--sl-color-accent-low);
+  color: var(--sl-color-white);
+}
+
+/* Small labels across the site: Geist Mono, uppercase, tracked wide. */
+.docs-slug {
+  font-family: var(--sl-font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  line-height: 1.4;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--docs-crop);
+}
+
+/* ---------------------------------------------------------------- the chrome */
+
+/*
+ * The top bar carries the page's own ground rather than a second one. A single
+ * hairline is enough to say where it ends, and it keeps the eye on the column.
+ */
+.header {
+  border-bottom: 1px solid var(--sl-color-hairline);
+}
+
+header.header {
+  padding-inline: var(--sl-nav-pad-x);
+}
+
+/* The wordmark: lowercase Geist, with a small mono "DOCS" beside it. */
+.site-title {
+  font-family: var(--docs-font-display);
+  font-size: 1.25rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: var(--sl-color-white);
+}
+
+.site-title:hover {
+  color: var(--sl-color-white);
+}
+
+.site-title::after {
+  content: "DOCS";
+  font-family: var(--sl-font-mono);
+  font-size: 0.625rem;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  color: var(--docs-crop);
+  transform: translateY(-0.15em);
+}
+
+/* Search looks like a field, not a button. */
+.site-search button[data-open-modal] {
+  border-radius: 0.3125rem;
+  border-color: var(--sl-color-hairline-light);
+  background-color: transparent;
+  font-size: var(--sl-text-xs);
+  color: var(--sl-color-gray-3);
+  transition: border-color 140ms var(--docs-ease);
+}
+
+.site-search button[data-open-modal]:hover {
+  border-color: var(--sl-color-gray-4);
+}
+
+.site-search button[data-open-modal] kbd {
+  font-family: var(--sl-font-mono);
+  font-size: 0.6875rem;
+  background-color: transparent;
+  color: var(--docs-crop);
+}
+
+/*
+ * The menu button on a phone. Starlight fills it solid, which is too loud
+ * here. A hairline and the page's own ink is enough.
+ */
+starlight-menu-button button {
+  border: 1px solid var(--sl-color-hairline-light);
+  border-radius: 0.3125rem;
+  background-color: var(--sl-color-bg-nav);
+  color: var(--sl-color-white);
+  box-shadow: none;
+}
+
+starlight-menu-button[aria-expanded="true"] button {
+  background-color: var(--sl-color-bg-sidebar);
+  color: var(--sl-color-white);
+}
+
+/* ----------------------------------------------------------------- the rail */
+
+/*
+ * Group headings are small labels, not headlines. Mono caps, with a hairline
+ * running out to the edge so the next group is easy to spot.
+ */
+.sidebar-content .group-label .large {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-family: var(--sl-font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--docs-crop);
+}
+
+.sidebar-content .group-label .large::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background-color: var(--sl-color-hairline);
+}
+
+.sidebar-content summary {
+  padding-block: 0.5rem;
+}
+
+.sidebar-content .caret {
+  width: 0.9375rem;
+  height: 0.9375rem;
+  color: var(--docs-crop);
+}
+
+.sidebar-content .top-level > li + li {
+  margin-top: 1.125rem;
+}
+
+/*
+ * Starlight draws a guide line down the left of every group. Beside the
+ * current page, that line turns green and thickens. No pill, no fill.
+ */
+.sidebar-content ul ul li {
+  border-inline-start-color: var(--sl-color-hairline);
+  transition: border-color 140ms var(--docs-ease);
+}
+
+.sidebar-content ul ul li:has(> a[aria-current="page"]) {
+  border-inline-start-color: var(--sl-color-accent);
+  box-shadow: inset 1px 0 0 var(--sl-color-accent);
+}
+
+.sidebar-content a {
+  border-radius: 0;
+  padding-block: 0.3125rem;
+  color: var(--sl-color-gray-3);
+  transition: color 140ms var(--docs-ease);
+}
+
+.sidebar-content a:hover,
+.sidebar-content a:focus {
+  color: var(--sl-color-white);
+}
+
+.sidebar-content a[aria-current="page"],
+.sidebar-content a[aria-current="page"]:hover,
+.sidebar-content a[aria-current="page"]:focus {
+  background-color: transparent;
+  font-weight: 500;
+  color: var(--sl-color-white);
+}
+
+/* ------------------------------------------------------------------ the toc */
+
+#starlight__on-this-page,
+mobile-starlight-toc h2 {
+  font-family: var(--sl-font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--docs-crop);
+}
+
+.right-sidebar starlight-toc ul {
+  border-inline-start: 1px solid var(--sl-color-hairline);
+}
+
+.right-sidebar starlight-toc ul ul {
+  border-inline-start: 0;
+}
+
+.right-sidebar starlight-toc li {
+  border-inline-start: 1px solid transparent;
+  margin-inline-start: -1px;
+  transition: border-color 140ms var(--docs-ease);
+}
+
+.right-sidebar starlight-toc li:has(> a[aria-current="true"]) {
+  border-inline-start-color: var(--sl-color-accent);
+  box-shadow: inset 1px 0 0 var(--sl-color-accent);
+}
+
+.right-sidebar starlight-toc a {
+  border-radius: 0;
+  font-size: var(--sl-text-xs);
+  color: var(--sl-color-gray-3);
+  transition: color 140ms var(--docs-ease);
+}
+
+.right-sidebar starlight-toc a:hover {
+  color: var(--sl-color-white);
+}
+
+.right-sidebar starlight-toc a[aria-current="true"] {
+  color: var(--sl-color-white);
+}
+
+/* -------------------------------------------------------------- the column */
+
+/*
+ * The title panel and the prose are one sheet, not two. Starlight rules
+ * between them; the eyebrow and the title's own hairline already say where the
+ * page starts.
+ */
+.content-panel + .content-panel {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.sl-markdown-content {
+  font-size: 1rem;
+  color: var(--sl-color-gray-2);
+}
+
+.sl-markdown-content h2,
+.sl-markdown-content h3,
+.sl-markdown-content h4,
+.sl-markdown-content h5,
+.sl-markdown-content h6 {
+  color: var(--sl-color-white);
+  letter-spacing: -0.02em;
+  font-weight: 600;
+}
+
+.sl-markdown-content h2,
+.sl-markdown-content h3 {
+  letter-spacing: -0.03em;
+}
+
+/*
+ * An h2 opens a new part of the page, so it gets a hairline above it and room
+ * to breathe. h3 and below sit inside that part and get neither.
+ */
+.sl-markdown-content
+  :not(h1, h2, h3, h4, h5, h6, .sl-heading-wrapper)
+  + :is(h2, .sl-heading-wrapper.level-h2) {
+  margin-top: 3.5rem;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--sl-color-hairline);
+}
+
+.sl-markdown-content
+  :not(h1, h2, h3, h4, h5, h6, .sl-heading-wrapper)
+  + :is(h3, .sl-heading-wrapper.level-h3) {
+  margin-top: 2.5rem;
+}
+
+/* Links are green, with a faint underline that fills in on hover. */
+.sl-markdown-content a:not(:where(.not-content *)) {
+  color: var(--sl-color-text-accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+  text-decoration-color: color-mix(
+    in oklab,
+    var(--sl-color-accent) 35%,
+    transparent
+  );
+  transition: text-decoration-color 140ms var(--docs-ease);
+}
+
+.sl-markdown-content a:not(:where(.not-content *)):hover {
+  text-decoration-color: var(--sl-color-accent);
+}
+
+/* The anchor beside a heading stays quiet until hovered, then turns green. */
+.sl-markdown-content .sl-anchor-link {
+  color: var(--docs-crop);
+  text-decoration: none;
+}
+
+.sl-markdown-content .sl-anchor-link:hover {
+  color: var(--sl-color-accent);
+}
+
+.sl-markdown-content strong {
+  font-weight: 600;
+  color: var(--sl-color-white);
+}
+
+/*
+ * Inline code: Geist Mono on the sunk grey, with a hairline so it holds its
+ * shape on both light and dark grounds.
+ */
+.sl-markdown-content code:not(:where(.expressive-code *)) {
+  border: 1px solid var(--sl-color-hairline-light);
+  border-radius: 0.25rem;
+  padding: 0.125em 0.3em;
+  font-size: 0.8125em;
+  background-color: var(--sl-color-bg-inline-code);
+  color: var(--sl-color-gray-1);
+}
+
+.sl-markdown-content
+  :is(h1, h2, h3, h4, h5, h6)
+  code:not(:where(.expressive-code *)) {
+  font-size: 0.85em;
+}
+
+/*
+ * A table is a specification. Mono in the head, hairlines between the rows,
+ * and no box around the outside — the columns are the structure.
+ */
+.sl-markdown-content table:not(:where(.not-content *)) {
+  border-collapse: collapse;
+  font-size: var(--sl-text-sm);
+}
+
+.sl-markdown-content th:not(:where(.not-content *)) {
+  border: 0;
+  border-bottom: 1px solid var(--sl-color-hairline-light);
+  padding: 0 1rem 0.625rem 0;
+  font-family: var(--sl-font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--docs-crop);
+}
+
+.sl-markdown-content td:not(:where(.not-content *)) {
+  border: 0;
+  border-bottom: 1px solid var(--sl-color-hairline);
+  padding: 0.75rem 1rem 0.75rem 0;
+  vertical-align: baseline;
+}
+
+.sl-markdown-content :is(th, td):not(:where(.not-content *)):last-child {
+  padding-inline-end: 0;
+}
+
+/* A quotation gets a green rule in the margin. */
+.sl-markdown-content blockquote:not(:where(.not-content *)) {
+  border-inline-start: 2px solid var(--sl-color-accent);
+  padding-inline-start: 1.25rem;
+  color: var(--sl-color-gray-3);
+  font-style: normal;
+}
+
+.sl-markdown-content hr:not(:where(.not-content *)) {
+  border: 0;
+  border-top: 1px solid var(--sl-color-hairline);
+}
+
+.sl-markdown-content :is(ul, ol):not(:where(.not-content *)) {
+  padding-inline-start: 1.25rem;
+}
+
+.sl-markdown-content li:not(:where(.not-content *))::marker {
+  color: var(--docs-crop);
+}
+
+.sl-markdown-content li + li:not(:where(.not-content *)) {
+  margin-top: 0.4rem;
+}
+
+/*
+ * Step numbers: a small square in Geist Mono on the sunk grey.
+ */
+.sl-steps > li::before {
+  border-radius: 0.25rem;
+  box-shadow: inset 0 0 0 1px var(--sl-color-hairline-light);
+  background-color: var(--sl-color-bg-sidebar);
+  font-family: var(--sl-font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--docs-crop);
+}
+
+.sl-steps > li::after {
+  background-color: var(--sl-color-hairline);
+}
+
+/* A card is a door. One hairline, and the arrow does the pointing. */
+.sl-link-card {
+  border-radius: 0.3125rem;
+  border-color: var(--sl-color-hairline-light);
+  box-shadow: none;
+  transition:
+    border-color 140ms var(--docs-ease),
+    background-color 140ms var(--docs-ease);
+}
+
+.sl-link-card:hover {
+  border-color: var(--sl-color-accent);
+  background-color: transparent;
+}
+
+.sl-link-card .title {
+  font-size: var(--sl-text-base);
+}
+
+/* The whole card is the link, so underlining the title as well says it twice. */
+.sl-markdown-content .sl-link-card a {
+  color: var(--sl-color-white);
+  text-decoration: none;
+}
+
+/* --------------------------------------------------------------- the asides */
+
+/*
+ * An aside is a note in the margin, not a coloured box. The left rule carries
+ * the meaning and the ground is only lightly tinted. Amber and red always mean
+ * something is wrong.
+ */
+.starlight-aside {
+  border-radius: 0 0.3125rem 0.3125rem 0;
+  border-inline-start-width: 2px;
+  padding: 0.875rem 1.125rem;
+  color: var(--sl-color-gray-2);
+  background-color: color-mix(
+    in oklab,
+    var(--sl-color-asides-border) 7%,
+    transparent
+  );
+}
+
+.starlight-aside__title {
+  font-family: var(--sl-font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+}
+
+.starlight-aside__icon {
+  font-size: 1.1em;
+}
+
+/* ---------------------------------------------------------------- the moves */
+
+/*
+ * Previous and next are directions, not cards. A hairline on top, a mono
+ * label, and the title in Geist.
+ */
+.pagination-links a {
+  border: 0;
+  border-top: 1px solid var(--sl-color-hairline-light);
+  border-radius: 0;
+  padding: 1rem 0;
+  box-shadow: none;
+  color: var(--docs-crop);
+  font-family: var(--sl-font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  transition: border-color 140ms var(--docs-ease);
+}
+
+.pagination-links a:hover {
+  border-top-color: var(--sl-color-accent);
+}
+
+.pagination-links a svg {
+  color: var(--docs-crop);
+}
+
+.pagination-links .link-title {
+  display: inline-block;
+  margin-top: 0.375rem;
+  font-family: var(--sl-font);
+  font-size: var(--sl-text-base);
+  font-weight: 500;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--sl-color-white);
+}
+
+footer .meta {
+  font-size: var(--sl-text-xs);
+  color: var(--docs-crop);
+}
+
+/* ------------------------------------------------------------------- focus */
+
+/* One green focus ring, everywhere. */
+:focus-visible {
+  outline: 2px solid var(--sl-color-accent);
+  outline-offset: 2px;
+  border-radius: 0.1875rem;
+}
+
+/* ---------------------------------------------------------------- the code */
+
+/*
+ * Code blocks sit flat in the page: one hairline, the shared radius, no
+ * shadow.
+ */
+.expressive-code .frame {
+  box-shadow: none;
+}
+
+.expressive-code .frame pre {
+  border-radius: 0.3125rem;
+}
+
+.expressive-code figcaption.header {
+  border-bottom: 0;
+}
+
+.expressive-code .frame.is-terminal .header,
+.expressive-code figcaption .title {
+  font-family: var(--sl-font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.09em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 1ms !important;
+    animation-duration: 1ms !important;
+  }
+}

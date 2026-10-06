@@ -1,0 +1,83 @@
+name: Promote docs to production
+
+# The only workflow that makes anything public. Nothing triggers it but a
+# person: run it from the Actions tab, choosing the ref you want live.
+on:
+  workflow_dispatch:
+    inputs:
+      version_id:
+        description: >-
+          Optional. A Version ID to promote instead of whatever is on staging.
+          Use this to roll back — `wrangler versions list` shows the IDs.
+        required: false
+        type: string
+
+# Never cancel a production deploy half-done, even if a second one is queued
+# behind it.
+concurrency:
+  group: docs-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  # To ask the Actions API which commit the staging workflow last succeeded on.
+  actions: read
+
+jobs:
+  promote:
+    name: Deploy an existing version to production
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      # Wrangler is a root dependency, and promoting needs nothing but wrangler
+      # and the config file. There is deliberately no build step here: the
+      # bundle being made live was built and uploaded by the staging workflow,
+      # so what ships is the exact artifact that was on staging rather than a
+      # fresh build of the same source.
+      - run: pnpm install --frozen-lockfile
+
+      - name: Deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          VERSION_ID: ${{ inputs.version_id }}
+          ACTOR: ${{ github.actor }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          if [ -n "${VERSION_ID}" ]; then
+            target=(--version-id "${VERSION_ID}" --percentage 100)
+            echo "Promoting version \`${VERSION_ID}\`." >> "$GITHUB_STEP_SUMMARY"
+          else
+            # The staging workflow tags every Version it uploads with the short
+            # SHA of the commit that produced it, so a commit SHA is enough to
+            # name a Version. The one to promote is whichever commit staging
+            # last succeeded on — asked of the Actions API rather than assumed
+            # to be the tip of main, because commits reach main without being
+            # staged: the size workflow's `[skip ci]` bot commits are the
+            # routine case, and a failed staging run is the other.
+            staged_sha=$(gh run list \
+              --workflow "Deploy docs to staging" \
+              --status success \
+              --limit 1 \
+              --json headSha \
+              --jq '.[0].headSha // empty')
+
+            if [ -z "${staged_sha}" ]; then
+              echo "::error::No successful staging run to promote. Run the staging workflow first, or pass a version_id."
+              exit 1
+            fi
+
+            target=(--version-tag "${staged_sha:0:8}@100%")
+            echo "Promoting the version staging last built, from commit \`${staged_sha:0:8}\`." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          pnpm exec wrangler versions deploy "${target[@]}" \
+            --message "Promoted by ${ACTOR} via GitHub Actions" \
+            --yes

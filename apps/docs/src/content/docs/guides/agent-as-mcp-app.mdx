@@ -1,0 +1,178 @@
+---
+title: Show your editor inside Claude and ChatGPT
+description: "Run the Canvas as an MCP App, so your users click a Block, ask, and accept the change without leaving the chat."
+---
+
+import { Code } from "@astrojs/starlight/components";
+import server from "../../../examples/mcp-app-server.ts?raw";
+import canvas from "../../../examples/mcp-app-canvas.tsx?raw";
+import viteConfig from "../../../examples/mcp-app-vite.config.ts?raw";
+
+## What you'll do
+
+Show your email editor inside a chat, so your users can click a Block, ask
+for a change, and accept it there.
+
+A Block is one piece of the email, such as a button. A Suggestion is a change
+your agent proposes. It shows on the Canvas, but is not stored until your
+users accept it.
+
+## The short version
+
+An MCP App is a web page an MCP server hands to a chat. The chat draws it in a
+frame under a tool call. This one is the Canvas, the editing surface of your
+editor.
+
+Start from the server in
+[Let Claude Code and Codex edit your emails](/guides/agent-over-mcp/). This
+version adds the Canvas as a resource, shows it under `open_email` and
+`suggest`, and adds three tools only the Canvas calls:
+
+<Code code={server} lang="ts" title="mcp-app-server.ts" />
+
+The page in the frame is a small editor. It loads the open email, draws each
+Suggestion, and has a box to ask about the selected Block:
+
+<Code code={canvas} lang="tsx" title="mcp-app-canvas.tsx" />
+
+It talks to the chat through `@modelcontextprotocol/ext-apps`. It draws
+Suggestions with the Slot from
+[Add an agent to your editor](/guides/add-an-agent/).
+
+Bundle it into one HTML file at `dist/canvas.html`, beside the server. Vite and
+`vite-plugin-singlefile` do this:
+
+<Code code={viteConfig} lang="ts" title="vite.config.ts" />
+
+Put a `canvas.html` beside it, which loads the page:
+
+```html
+<div id="root"></div>
+<script type="module" src="./mcp-app-canvas.tsx"></script>
+```
+
+Fill in the functions at the bottom of the server, then add it to your chat.
+
+## Options
+
+The server marks its tools with `_meta.ui`, which the chat reads:
+
+| Field         | Type       | Default            | What it does                                         |
+| ------------- | ---------- | ------------------ | ---------------------------------------------------- |
+| `resourceUri` | `string`   | —                  | The page to show under this tool's calls.            |
+| `visibility`  | `string[]` | `["model", "app"]` | Who can call it. `["app"]` hides it from your agent. |
+
+The resource carries one of its own, `_meta.ui.csp`:
+
+| Field             | Type       | Default | What it does                                        |
+| ----------------- | ---------- | ------- | --------------------------------------------------- |
+| `resourceDomains` | `string[]` | none    | Where images and fonts may load from. Add your CDN. |
+| `connectDomains`  | `string[]` | none    | Where the page may `fetch`. This one needs none.    |
+
+`agentTools` takes the same options as in
+[Add an agent to your editor](/guides/add-an-agent/#options). This server sets
+`focus` and `meta`, and leaves `autoAccept` off.
+
+## In depth
+
+### Which chats show it
+
+Claude shows MCP Apps, on the web and in the desktop app. So does ChatGPT, and
+VS Code's chat. Each draws the Canvas in a frame in the conversation.
+
+Claude Code and Codex run in a terminal, which cannot draw a page. They get
+only the tools, and every Suggestion would wait for a Canvas nobody sees. Give
+them [the plain server](/guides/agent-over-mcp/) instead, with `autoAccept`.
+
+Claude's desktop app starts the server over stdio, as in the example. Claude on
+the web and ChatGPT reach only servers on the internet. For them, host it over
+HTTP, as in
+[Running it over HTTP](/guides/agent-over-mcp/#running-it-over-http).
+
+Over HTTP, one server answers every chat. Keep `openId` and `focus` per MCP
+session, not in module variables, or two chats share one open email.
+
+### What happens when your users ask
+
+1. Your users ask the chat to open an email. Your agent calls `open_email`, and
+   the Canvas shows under it.
+2. They click a Block, type an ask and press Ask.
+3. The Canvas calls `focus_block` with that Block's id. Then it sends the ask
+   into the chat, as if your users had typed it.
+4. Your agent calls `read_email`. The server made the tools with `focus` set to
+   that Block, so it comes first.
+5. Your agent calls `suggest`. The server checks the Suggestion and saves it
+   beside the email. A new Canvas shows under the call, with the Suggestion
+   drawn on the Blocks it touches.
+6. Your users press Accept or Reject on the Canvas. The Canvas saves the email,
+   and tells the server which Suggestion is settled.
+
+The server clears `focus` once your agent has suggested something. An ask
+typed straight into the chat after that is about no Block in particular.
+
+### Where Suggestions live
+
+There is no browser tab that stays open, so the server stores open Suggestions
+beside the email. Each is saved as `suggestion.toJSON()`, and restored with
+`editor.suggest(json.edits, json)`.
+
+A restored Suggestion that no longer fits comes back stale. Its Block was
+removed, say, or someone set the same prop by hand. It shows faded, and offers
+Dismiss in place of Accept.
+
+A Suggestion's `id` is new each time it is restored. So the server puts its own
+key in `meta`, and the Canvas names a settled Suggestion by that key.
+
+### Tools only the Canvas calls
+
+`load_email`, `focus_block` and `save_email` have `visibility: ["app"]`. The
+chat hides them from your agent, and lets the Canvas call them through
+`app.callServerTool`.
+
+They run as the same person as the rest of the server. Check what `save_email`
+gets as you check a save from your editor in the browser.
+
+### Several frames in one chat
+
+The chat shows a new Canvas under each `suggest` call. Earlier ones stay in the
+conversation.
+
+Each Canvas saves a moment after your users change something. When the
+pointer comes back to an older one, it loads the email again if anything
+changed. It never does while a change of its own waits to be saved.
+
+### The page runs in a sandbox
+
+The chat loads the page from its own origin, with a strict content security
+policy. Nothing loads from the network unless you list where from. So the
+scripts and styles go inside the HTML file, bundled into one.
+
+Images in the email load from your CDN. List it in `resourceDomains`, or they
+show broken. The Canvas draws the email in a frame with no address of its own,
+so it needs no `frameDomains`.
+
+## Common problems
+
+**The chat shows text, but no Canvas.** The chat does not show MCP Apps, or the
+resource is not found. Check `resources/read` gives back `dist/canvas.html`
+with the `text/html;profile=mcp-app` MIME type.
+
+**The Canvas says "Opening the email…" and stays there.** No email is open yet.
+`load_email` fails until your agent calls `open_email`.
+
+**Images in the email show broken.** Add the host your images load from to
+`resourceDomains`.
+
+**Your agent changes a Block other than the one clicked.** `focus` is a hint,
+not a fence. Your agent can still touch neighbours, and your users see every
+Block a Suggestion touches before they accept.
+
+**A Suggestion shows faded with only Dismiss.** It went stale. Someone changed
+what it touches since your agent made it. Ask again.
+
+## Why it works this way
+
+The Canvas in the chat is the same Canvas as in your product, so your users
+review an agent's change the same way in both. lekh ships no MCP server, so
+your auth and storage stay yours. The [Agent tools reference](/reference/agent/)
+lists every tool.

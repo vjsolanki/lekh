@@ -1,0 +1,93 @@
+name: Preview docs for a pull request
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+# Each PR gets its own lane. Pushing twice to a branch should replace the
+# preview, not race against itself for the alias.
+concurrency:
+  group: docs-preview-${{ github.event.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  preview:
+    name: Upload a version and alias it to the PR
+    # A pull_request run from a fork is given no secrets, so the Cloudflare
+    # token would be empty and the upload would fail on every outside
+    # contribution. Skipping is quieter than a red X nobody can fix.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
+      - name: Upload a version
+        id: upload
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_OUTPUT_FILE_PATH: ${{ runner.temp }}/wrangler-output.json
+          PR_NUMBER: ${{ github.event.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          # The PR's head commit. `github.sha` on a pull_request event is the
+          # merge commit GitHub synthesised, which exists on no branch.
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          # An alias becomes a DNS label — `pr-42-lekh-docs.<subdomain>` — so it
+          # has to start with a letter. The `pr-` prefix is what makes a bare
+          # number legal, and it reads better in the URL besides.
+          pnpm exec wrangler versions upload \
+            --preview-alias "pr-${PR_NUMBER}" \
+            --tag "${HEAD_SHA::8}" \
+            --message "$(printf 'PR #%s: %s' "${PR_NUMBER}" "${PR_TITLE:-}" | head -n 1 | cut -c1-100)"
+
+          alias_url=$(jq -rs '[.[] | select(.type == "version-upload")] | last | .preview_alias_url // ""' \
+            "${WRANGLER_OUTPUT_FILE_PATH}")
+          echo "alias_url=${alias_url}" >> "$GITHUB_OUTPUT"
+
+      # One comment per PR, edited in place. A new comment on every push buries
+      # the conversation under a stack of near-identical links.
+      - name: Comment the preview URL
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_NUMBER: ${{ github.event.number }}
+          ALIAS_URL: ${{ steps.upload.outputs.alias_url }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+
+          marker="<!-- docs-preview -->"
+          # Built with printf rather than a quoted multi-line string: this
+          # script is a YAML block scalar, so every continuation line would
+          # carry its indentation into the comment and Markdown would read the
+          # result as a code block.
+          body=$(printf '%s\n### 📖 Docs preview\n\n| | |\n|---|---|\n| Preview | %s |\n| Commit | `%s` |\n\nThis is an unreleased Version. Production is untouched.\n' \
+            "${marker}" "${ALIAS_URL:-_unavailable_}" "${HEAD_SHA::8}")
+
+          # The marker is the only reliable way to find our own comment, since
+          # the body changes on every push. `--paginate` because a long PR can
+          # push the comment past the first page, and a missed match would post
+          # a duplicate rather than edit.
+          existing=$(gh api --paginate "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
+            --jq "map(select(.body | startswith(\"${marker}\"))) | first | .id // empty")
+
+          if [ -n "${existing}" ]; then
+            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/issues/comments/${existing}" \
+              -f body="${body}" --silent
+          else
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/issues/${PR_NUMBER}/comments" \
+              -f body="${body}" --silent
+          fi

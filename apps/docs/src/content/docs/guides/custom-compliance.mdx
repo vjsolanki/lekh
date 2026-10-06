@@ -1,0 +1,230 @@
+---
+title: Build a compliance footer of your own
+description: "Required Blocks nobody can lose, with your own error and warning codes."
+---
+
+import { Code } from "@astrojs/starlight/components";
+import preset from "../../../examples/custom-compliance.tsx?raw";
+import wiring from "../../../examples/custom-compliance-wiring.ts?raw";
+
+## What you'll do
+
+Make a Block your emails must carry — a preference centre link, a regulator's
+disclaimer, a brand footer — and make it hard for anybody to break.
+
+The shipped [unsubscribe and postal address](/guides/compliance/) Blocks are
+built exactly this way. Nothing about them is privileged.
+
+## The short version
+
+Three fields do the work: `required`, `deletable`, and the Block's own
+`validate`.
+
+<Code code={preset} lang="tsx" title="house-footer.tsx" />
+
+Compose it alongside your Blocks, and let the root accept the new types:
+
+<Code code={wiring} lang="ts" title="editor.ts" />
+
+Every new email now starts with both Blocks, neither can be deleted on its own,
+and an email missing one cannot be sent.
+
+## Options
+
+| Field       | Type      | Default | What it does                                        |
+| ----------- | --------- | ------- | --------------------------------------------------- |
+| `required`  | `boolean` | `false` | Every Document must hold at least one of this type. |
+| `deletable` | `boolean` | `true`  | `false` refuses a direct delete.                    |
+| `validate`  | function  | absent  | The Block's own check. Returns Diagnostics.         |
+
+And the codes the library raises for you, without you writing anything:
+
+| Code                                  | Severity | When                                        |
+| ------------------------------------- | -------- | ------------------------------------------- |
+| `DiagnosticCode.requiredBlockMissing` | error    | No Block of a `required` type is present.   |
+| `DiagnosticCode.blockUnregistered`    | error    | The email holds a type you did not compose. |
+
+`required-block-missing` arrives carrying a `restore-required-block` Repair, so
+your "Fix it" button works with no code from you.
+
+## In depth
+
+### A factory, not a constant
+
+Export a function that returns the Definitions, the way
+`createCompliancePreset` does. A Preset is just `readonly BlockDefinition[]`, so
+the factory costs nothing and buys the one thing a compliance Block always
+needs: somewhere to put the URL.
+
+Hard-code the URL and everybody whose provider substitutes a different token
+maintains a fork of your footer.
+
+### Configuration or content
+
+This is the decision that makes a footer safe, and it is worth getting right
+before you write the Schema.
+
+**Configuration** is anything no person can supply at design time. A
+per-recipient preferences URL is the clearest case: it does not exist while
+somebody is designing the email. Keep it out of the Schema and capture it in the
+factory, so no control is ever generated for it. [Values nobody should
+edit](/guides/custom-blocks/#values-nobody-should-edit) has the pattern.
+
+**Content** is anything a person can reasonably type and might reasonably want
+different. A postal address, a disclaimer, the words in a link. Make it an
+ordinary Schema prop.
+
+The two behave differently when you change your mind:
+
+| You change              | Emails already saved                 |
+| ----------------------- | ------------------------------------ |
+| A configured URL        | All of them pick it up.              |
+| A Schema `defaultValue` | Only those nobody edited pick it up. |
+
+That second row is why the default is a starting point, not a policy. Someone
+who typed their own disclaimer keeps it. It also means changing a configured URL
+needs **no migration of any email you have already saved**, because the URL was
+never in one.
+
+Give the link's wording as a prop, always. A fixed label leaves your Block
+unable to produce a compliant footer in any language but English.
+
+### Set both flags, and know what each covers
+
+[Making a Block required](/guides/custom-blocks/#making-a-block-required) has the
+two flags in full. What matters for a footer is the gap between them.
+
+`deletable: false` refuses **one gesture**: deleting that Block directly.
+Deleting the section _around_ it still succeeds. Refusing that would make
+redesigning a footer impossible.
+
+`required: true` is what covers the gap. It is a rule about the **Document**, so
+the delete goes through, the email becomes invalid, and it says so — as
+`required-block-missing`, carrying a repair that puts the Block back.
+
+Set both. Either alone leaves a way to ship an email without your footer.
+
+### Your codes are ordinary codes
+
+Nothing about a compliance code is special. Pick a stable string, export it, and
+match on it:
+
+```ts
+export const EMPTY_PREFERENCES_LABEL = "preferences-label-empty";
+```
+
+Then in `validate`, return a Diagnostic carrying it. That is the whole
+mechanism for getting a finding of yours into the panel, into
+`editor.getDiagnostics()`, and into `renderDocument`'s refusal.
+
+The `message` is a fallback. Word the finding yourself, keyed on the code, and
+your panel gets your tone and your translations.
+
+Namespace the code if your Blocks are published for other people to compose:
+`acme/preferences-label-empty`. Codes share one space with everybody else's.
+
+### Which findings are errors
+
+An **error** in the example: the link has no text. A link nobody can see is the
+same as no link, so it is not really a compliant email. It is a fact rather than
+a judgement, and it carries a repair, so somebody who hits it has a way out.
+
+A **warning** in the example: the disclaimer is blank. The usual way to reach
+that is you not having configured one yet, and a library that refused to render
+anything until you did would be teaching you to switch validation off.
+
+The rule of thumb: an error is for a finding that is certainly true and
+certainly fixable. Everything else is a warning that somebody can escalate.
+
+Anybody composing your Preset can raise a warning without forking it:
+
+```ts
+createEditor({
+  definitions,
+  severities: { "disclaimer-empty": "error" },
+});
+```
+
+Severity only goes **up**. An error can never be softened into a warning, or the
+render path's refusal becomes opt-out. If somebody does not want your Required
+Block, they decline to compose your Preset.
+
+### Repairs that put things back
+
+Attach a repair whenever something could plausibly fix the finding.
+
+For an emptied prop, unset it rather than writing the old value in:
+
+```ts
+{ kind: "set-prop", blockId: block.id, prop: "label", value: undefined }
+```
+
+An unset prop resolves to the Schema default. So somebody who localised your
+Definition gets their wording back, not the English you shipped.
+
+Leave `repair` off when nothing could know the answer. Nothing knows your
+disclaimer.
+
+See [Write your own checks](/guides/custom-validators/) for repair kinds of your
+own.
+
+### The root has to accept it
+
+A Required Block must be placeable at the root, because that is where its repair
+puts it back. `createEditor` throws `EditorConfigurationError` at startup when
+it is not — better than an email nobody can fix.
+
+A Preset written before your Block existed cannot name it in `accepts`, so widen
+the containers on the way past. The wiring example above does that with the
+`accepting` helper from [Write your own
+Block](/guides/custom-blocks/#mixing-the-two).
+
+Check `maxChildren` on the root too. A root that accepts fewer children than you
+have Required Blocks is the same configuration error.
+
+### Making it a real footer
+
+Everything else is an ordinary Block. Give it the styling props your other
+Blocks have — `fontSize`, `color`, `align`, `backgroundColor` — and it fits into
+the inspector with no special handling.
+
+One prop worth withholding: a `showOn` choice, or any switch that hides the
+Block on some screens. That is not a design control. It takes the Block off
+most of the opens.
+
+Beyond that, do not try to stop somebody making the link inconspicuous. The
+controls you would have to remove are the ones needed to design a footer at all.
+
+## Common problems
+
+**`EditorConfigurationError` on startup.** The root's `accepts` does not name
+your Required Block's type, or its `maxChildren` is below the number of Required
+Blocks.
+
+**Your Block never appears in a new email.** `required` is missing. Seeding
+follows it.
+
+**Somebody deleted it anyway.** They deleted the section around it. That is
+allowed, and `required-block-missing` covers it. Render your Diagnostics.
+
+**The finding never shows up.** Nothing draws it. See [Show problems and offer
+fixes](/guides/diagnostics/).
+
+**Every untouched Block reports as empty.** Your `validate` reads
+`block.props["x"]` directly. An unset prop is absent, not the default — resolve
+against the Schema first.
+
+**Old emails still show the old disclaimer.** Somebody edited it there. Your
+`defaultValue` only sets the starting value.
+
+**The URL is dead in the sent email.** Your provider's token is different, or it
+does not substitute inside an `href`. Check what yours expects.
+
+## Why it works this way
+
+The split runs through all of it: the URL is configuration because no person can
+supply it, and the wording is content because a person must. Getting that
+boundary right is what lets somebody restyle a footer freely without ever being
+able to ship an email that breaks your rules.
+
+Read [Forgiving editor, strict render](/why/forgiving-editor/).

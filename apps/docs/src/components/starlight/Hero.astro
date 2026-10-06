@@ -1,0 +1,105 @@
+---
+/**
+ * The front page's opening.
+ *
+ * Starlight's hero centres a title over an image, which is the shape a product
+ * page takes when it has a logo to show. This library's argument is that it
+ * shows nothing, so there is no image: the whole of it is set type, ranged left
+ * against the same column the prose uses, so the page reads as one sheet rather
+ * than a banner with documentation underneath.
+ *
+ * Overrides `@astrojs/starlight/components/Hero.astro`.
+ */
+const { data } = Astro.locals.starlightRoute.entry;
+const { tagline, actions = [] } = data.hero ?? {};
+
+// The headline is the hero's own title when one is given, falling back to the
+// page title — the same order Starlight uses.
+const headline = data.hero?.title ?? data.title;
+---
+
+<div class="hero">
+  <p class="docs-slug">Headless · React · Node, browser, edge</p>
+  <h1 id="_top" set:html={headline} />
+  {tagline && <div class="tagline" set:html={tagline} />}
+  {
+    actions.length > 0 && (
+      <div class="actions">
+        {actions.map(({ link, text, variant }) => (
+          <a href={link} class:list={["action", variant]}>
+            {text}
+          </a>
+        ))}
+      </div>
+    )
+  }
+</div>
+
+<style>
+  .hero {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1.25rem;
+    padding-block: 1rem 2.5rem;
+    border-bottom: 1px solid var(--sl-color-hairline);
+  }
+
+  /* Large Geist at 600, set tight. */
+  h1 {
+    max-width: 18ch;
+    font-family: var(--docs-font-display);
+    font-size: clamp(2.5rem, calc(1rem + 5.5vw), 4.25rem);
+    font-weight: 600;
+    line-height: 1.02;
+    letter-spacing: -0.04em;
+    color: var(--sl-color-white);
+    text-wrap: balance;
+  }
+
+  .tagline {
+    max-width: 46ch;
+    font-size: var(--sl-text-lg);
+    line-height: 1.55;
+    color: var(--sl-color-gray-2);
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.75rem;
+    margin-top: 0.5rem;
+  }
+
+  /* Two weights of action. The primary one is filled green. */
+  .action {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    border: 1px solid var(--sl-color-hairline-light);
+    border-radius: 0.3125rem;
+    padding: 0.5625rem 1rem;
+    font-size: var(--sl-text-sm);
+    font-weight: 500;
+    text-decoration: none;
+    color: var(--sl-color-white);
+    transition:
+      border-color 140ms var(--docs-ease),
+      background-color 140ms var(--docs-ease);
+  }
+
+  .action:hover {
+    border-color: var(--sl-color-gray-4);
+  }
+
+  .action.primary {
+    border-color: var(--sl-color-bg-accent);
+    background-color: var(--sl-color-bg-accent);
+    color: var(--sl-color-text-invert);
+  }
+
+  .action.primary:hover {
+    border-color: var(--docs-button-hover);
+    background-color: var(--docs-button-hover);
+  }
+</style>

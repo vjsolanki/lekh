@@ -1,0 +1,251 @@
+---
+title: Control what can go where
+description: "Nesting rules, containers that own their children, and telling somebody why a drop was refused."
+---
+
+import { Code } from "@astrojs/starlight/components";
+import refusal from "../../../examples/nesting-refusal.tsx?raw";
+import refusalChrome from "../../../examples/nesting-refusal-chrome.tsx?raw";
+import container from "../../../examples/nesting-container.tsx?raw";
+import Demo from "../../../components/Demo.astro";
+
+## What you'll do
+
+Decide which Blocks may go inside which, and say something useful when one of
+your users tries a drop that will not work.
+
+## The short version
+
+`accepts` is the whole rule. A Block Definition that declares it is a
+container; one that does not is a leaf.
+
+```ts
+accepts: ["heading", "paragraph", "image"],
+```
+
+It is an explicit list of types. There is no wildcard, and nothing is accepted
+by default. A Block your editor knows about but no container names is a Block
+that appears in the palette and cannot be dropped anywhere.
+
+When a drop is turned down, `explainDropRefusal` says why, and you write the
+sentence:
+
+<Code code={refusal} lang="tsx" title="refusal.tsx" />
+
+## Show the refusal on the canvas
+
+A sentence is only half of it. The `dropRefusal` slot is where it goes.
+
+<Code code={refusalChrome} lang="tsx" title="refusal-chrome.tsx" />
+
+```tsx
+<Canvas slots={{ dropRefusal: DropRefusal }} />
+```
+
+This is the one slot handed a `pointer` as well as a `rect`, because a refusal
+has two positions and they are rarely the same one. It is _about_ a container —
+often a full-width Section, sometimes the whole email — and it has to be _read_
+at the cursor, which is where somebody is looking. Outlining the container and
+putting a tip under the pointer are both reasonable house styles, so the slot
+gives you each and settles neither. The pointer is always inside `rect`, so the
+two are never far apart.
+
+It is the counterpart to `dropIndicator`: exactly one of the two is drawn
+whenever a drag is over the email, and neither when the pointer is somewhere
+else entirely. That third case is `elsewhere`, and it is how somebody cancels
+rather than something to report.
+
+Leave the slot out and you get a plain default — a tip under the pointer
+showing `refusal.message`. It is there so a refused drop does not look like a
+broken one, not because it is the message you want. Passing your own replaces
+it entirely, including with a component that renders `null`.
+
+See [Draw the chrome](/guides/chrome/) for how slots work generally.
+
+## Options
+
+Four fields on a Block Definition decide its structure.
+
+| Field         | Type       | Default | What it does                                                       |
+| ------------- | ---------- | ------- | ------------------------------------------------------------------ |
+| `accepts`     | `string[]` | absent  | Types that may be children. Absent makes the Block a leaf.         |
+| `maxChildren` | `number`   | none    | Upper bound. A two-column row cannot be filled with twelve.        |
+| `minChildren` | `number`   | none    | How many it is created holding, and the floor it never goes below. |
+| `structural`  | `boolean`  | `false` | The parent owns it. Never in the palette, never dragged.           |
+
+And one Schema entry decides how a container divides itself:
+
+| Entry             | Type     | Default | What it does                                              |
+| ----------------- | -------- | ------- | --------------------------------------------------------- |
+| `kind: "width"`   | any prop | —       | Opts a Block into sharing its parent. The first one wins. |
+| `constraints.min` | `number` | `0`     | The narrowest that share may get.                         |
+
+<Code code={container} lang="tsx" title="row.tsx" />
+
+## Try it
+
+Every cell below is a live call to `explainDropRefusal` against a real editor,
+not a table written by hand. Tick the box to fill the Section and watch the
+answers change.
+
+<Demo name="drop-rules" />
+
+## In depth
+
+### Resolution walks upwards
+
+Dropping onto a leaf still lands somewhere. Resolution starts at the Block
+under the pointer and walks up its ancestors until it finds one that accepts
+the dragged type. Aiming at a paragraph inside a column puts the Block beside
+that paragraph, because the column is what accepted it.
+
+Once a parent is chosen, the drop lands beside one of its children — the one
+under the pointer, or the nearest one. A container's padding and the gaps
+between its children are the space somebody aims at when they mean "between
+these two", so that space resolves to a position between them rather than to
+the container itself.
+
+None of this touches the DOM. `resolveDropTarget` is a pure function of a
+pointer position, a list of measured rectangles and the accepts rules. You
+measure; it decides. That is what lets you test drag behaviour without a layout
+engine, and it is why the query carries `rects` rather than element references.
+
+### The three refusals, and the one non-refusal
+
+`DropRefusalCode` is closed at three, so a switch over it is exhaustive.
+
+| Code             | What happened                                 | What it usually means                     |
+| ---------------- | --------------------------------------------- | ----------------------------------------- |
+| `"not-accepted"` | No ancestor's `accepts` names this type.      | You added a Block and forgot a container. |
+| `"at-capacity"`  | `maxChildren` is already reached.             | The row is full.                          |
+| `"own-subtree"`  | The target is inside the Block being dragged. | Someone dragged a section into itself.    |
+
+A fourth outcome is not a refusal. `DropOutcome` has three states, and only two
+of them mean anything went wrong:
+
+```ts
+type DropOutcome =
+  | { status: "landing"; target: DropTarget }
+  | { status: "refused"; refusal: DropRefusal }
+  | { status: "elsewhere" };
+```
+
+`elsewhere` means the pointer is not over the email at all. That is how
+somebody cancels a drag — carry the Block off the canvas and let go — so
+showing an error for it punishes them for the normal way out. Draw chrome for
+`refused`. Draw nothing for `elsewhere`.
+
+### Structural Blocks
+
+A column is a Block. It is in the Document, it has props, it renders. What it
+is not is something anybody reaches for.
+
+`structural: true` takes it out of the palette and makes the canvas refuse to
+drag it. So a row keeps owning its columns: one cannot be carried in from
+outside, and cannot be carried out into a different row.
+
+It governs reach and nothing else. Every editor method stays open on a
+structural Block — `insertBlock`, `duplicateBlock`, `setProp` all work, and
+duplicating a column is the useful "another one like this". Rules enforced
+deeper down would have to exempt the callers that matter.
+
+That leaves a gap you have to fill: a Block nobody can drag needs another way
+in and another way to edit. Two methods answer that, and they are shaped like
+`getControls` so one panel pattern covers all three.
+
+| Method                  | Answers with                                                      |
+| ----------------------- | ----------------------------------------------------------------- |
+| `getAddableChildren()`  | Structural types the selected Block can gain, each with an `add`. |
+| `getEditableChildren()` | Its structural children, each with its own props.                 |
+
+`getAddableChildren` returns nothing once a Block is at `maxChildren`, so the
+"Add column" affordance disappears at the ceiling rather than sitting there
+refusing. It also returns nothing for most Blocks, because most containers
+accept only things already in the palette.
+
+`getEditableChildren` is one level deep on purpose. Seeding is one level deep,
+so a structural Block never holds another, and a panel that nested arbitrarily
+would be describing a shape the editor cannot produce.
+
+### Widths are a container's business, not a Block's
+
+Give a Schema entry `kind: "width"` and the Block joins the division of its
+parent. The first such entry wins; a Block with none is left out of the
+arithmetic entirely, and so is a container whose children have none.
+
+One rule governs the rest: **the children of one container always come to a
+hundred.** No Block's width is its own to set. Move one and the editor moves a
+sibling to keep the sum, and never takes any of them below the `min` its Schema
+declared.
+
+The numbers stay integers. Three columns are 34/33/33 rather than 33.333 each,
+with the odd point going to the first because that is where the eye starts.
+Somebody is typing into a box, and a third of a hundred is not a number they
+can type.
+
+A container whose stored widths do not add up — hand-written JSON, an import,
+or a Definition whose floor moved under values saved before it — is evened out
+rather than refused. None of those are things your users did, and none of them
+should leave somebody with a row they cannot touch.
+
+### Rules are checked when the editor is built
+
+Some mistakes cannot wait for a drag. `createEditor` throws
+`EditorConfigurationError` when the Definitions cannot make a working editor at
+all: no Definition for `rootType`, or a Required Block the root will not
+accept.
+
+A Required Block has to be placeable at the root, because that is where a
+repair puts it back. A root whose `accepts` omits it, or whose `maxChildren` is
+lower than the number of Required Blocks, is a configuration that could produce
+an email nobody can fix.
+
+`minChildren` is checked then too. A Definition declaring it must accept
+exactly one structural type, because what gets seeded would otherwise be
+decided by whichever type `accepts` happens to list first — an outcome chosen
+by array order and nothing else.
+
+### Adding your own Block to somebody else's Preset
+
+A Preset is `readonly BlockDefinition[]`, so composing is a spread. Registering
+your Block is not the same as making it droppable, though: the Preset's
+containers were written before your Block existed and cannot name it.
+
+Widen them on the way past. [Write your own
+Block](/guides/custom-blocks/#mixing-the-two) has the code, and the warning
+that goes with it — pass every type to every container and you get an editor
+where a heading goes inside a heading.
+
+## Common problems
+
+**Your Block is in the palette but will not drop anywhere.** No container's
+`accepts` names its `type`. This is the one that catches everybody adding a
+Block to a Preset.
+
+**Nothing drops into your new container.** `accepts` is absent or empty, which
+makes it a leaf. An empty array is not "anything".
+
+**`EditorConfigurationError` on startup.** The root does not accept a Required
+Block, or its `maxChildren` is below the number of Required Blocks.
+
+**Columns can be dragged out of their row.** The column Definition is missing
+`structural: true`.
+
+**A width you set snaps back to something else.** Widths are kept summing to 100. Setting one moves a sibling; setting one below its floor is clamped.
+
+**Widths reset the first time somebody touches a row.** The stored widths did
+not add to 100, so they were evened out. Check what wrote that Document.
+
+**The drop indicator points the wrong way.** A `DropTarget` carries an `axis`.
+On a horizontal parent, `before` and `after` mean left and right, so the
+indicator is a vertical line. Absent `axis` reads as vertical.
+
+## Why it works this way
+
+Nesting rules are refused, but nothing else is. A drop that cannot happen is
+stopped at the moment of the gesture, because there is no half-done state to
+leave behind and nothing to tell somebody about later. Everything that can be
+left in a bad state — a missing unsubscribe link, an empty required prop — is
+allowed and reported instead.
+
+Read [Forgiving editor, strict render](/why/forgiving-editor/).

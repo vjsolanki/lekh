@@ -1,0 +1,1308 @@
+---
+title: lekh
+description: "The editor: create one, define Blocks, and change an email."
+---
+
+import { Code } from "@astrojs/starlight/components";
+import hoverRow from "../../../examples/hover-row.tsx?raw";
+import lastAction from "../../../examples/last-action.ts?raw";
+import streamASuggestion from "../../../examples/stream-a-suggestion.ts?raw";
+import suggestAChange from "../../../examples/suggest-a-change.ts?raw";
+
+The main entry point. It holds the email, describes what can be edited, and is
+the only thing that changes anything.
+
+It runs anywhere: no DOM, no `node:` builtins. The canvas is a separate import.
+
+![Gzipped size of lekh](https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2Fvjsolanki%2F5d00f9ab6617974fe2b6a95b643ce5b7%2Fraw%2Flekh.json)
+
+## Import
+
+```ts
+import { createEditor, defineBlock } from "lekh";
+```
+
+## createEditor
+
+```ts
+function createEditor(options: EditorOptions): Editor;
+```
+
+Create it **once** and keep it. In React that means
+`useState(() => createEditor(...))`.
+
+### Options
+
+| Option         | Type                | Default     | What it does                                            |
+| -------------- | ------------------- | ----------- | ------------------------------------------------------- |
+| `definitions`  | `BlockDefinition[]` | —           | Required. Every Block this editor knows about.          |
+| `rootType`     | `string`            | —           | The root Block's type. Required unless `document` says. |
+| `document`     | `EmailDocument`     | a new one   | Open a saved email instead of starting fresh.           |
+| `validators`   | `Validator[]`       | `[]`        | Extra checks.                                           |
+| `severities`   | `SeverityOverrides` | `{}`        | Raise a finding's severity by code.                     |
+| `stage`        | `Stage`             | `"desktop"` | Which form factor it opens on.                          |
+| `origin`       | `string`            | `"local"`   | Stamped on every Op this editor makes.                  |
+| `createId`     | `() => string`      | built in    | Supply your own id generator.                           |
+| `textEngine`   | `TextEngine`        | none        | Needed before anybody can type rich text.               |
+| `resolveImage` | `ImageResolver`     | none        | Needed before anybody can add a picture.                |
+
+A new editor starts with an empty email already containing one of each Required
+Block, so nobody ever begins in an invalid state.
+
+### Throws
+
+`EditorConfigurationError` when the definitions cannot make a working editor:
+no Definition for `rootType`, or a Required Block the root will not accept.
+
+`TypeError` when neither `rootType` nor `document` was given.
+
+## createDocument
+
+```ts
+function createDocument(options: {
+  definitions: BlockDefinition[];
+  rootType: string;
+  createId?: () => string;
+}): EmailDocument;
+```
+
+An empty email, seeded with the Required Blocks, without standing up an editor.
+Useful for creating a row in your database before anybody opens it.
+
+## defineBlock
+
+```ts
+function defineBlock<TProps>(
+  definition: BlockDefinition<TProps>,
+): BlockDefinition<TProps>;
+```
+
+Describes one type of Block. It does nothing at runtime. It exists so `render`
+and `validate` know what your props are.
+
+| Field         | Type                                | Required | What it is                                                                                                       |
+| ------------- | ----------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------- |
+| `type`        | `string`                            | Yes      | Matches the `type` stored in the email.                                                                          |
+| `label`       | `string`                            | Yes      | The name shown in your palette.                                                                                  |
+| `schema`      | `BlockSchema<TProps>`               | Yes      | Which props can be edited.                                                                                       |
+| `render`      | `(context) => ReactElement \| null` | Yes      | How it draws, on canvas and in the final HTML.                                                                   |
+| `accepts`     | `string[]`                          | No       | Types it may contain. Absent means it is a leaf.                                                                 |
+| `maxChildren` | `number`                            | No       | Upper bound on children.                                                                                         |
+| `minChildren` | `number`                            | No       | How many children it is created holding, and the floor it is never taken below.                                  |
+| `seed`        | `() => Record<string, unknown>[]`   | No       | Starting props for the children it is created holding, one object each. Read only with `minChildren`.            |
+| `structural`  | `boolean`                           | No       | Defaults to `false`. `true` means only the parent makes one: no palette entry, and not draggable.                |
+| `version`     | `number`                            | No       | The version this code writes. Absent means 0.                                                                    |
+| `migrations`  | `Record<number, Migration>`         | No       | How to bring older saved Blocks forward.                                                                         |
+| `required`    | `boolean`                           | No       | Defaults to `false`. New emails are seeded with one, and losing it raises an error Diagnostic carrying a repair. |
+| `deletable`   | `boolean`                           | No       | Defaults to `true`. `false` refuses a direct delete; deleting a parent that holds it still works.                |
+| `standIn`     | `(context) => ReactElement`         | No       | The room it takes on the Canvas when `render` returns `null`. Never in the email.                                |
+| `validate`    | `(block, context) => Diagnostic[]`  | No       | A check that travels with the Block.                                                                             |
+
+See [Write your own Block](/guides/custom-blocks/) for `required` and
+`deletable` in use.
+
+`minChildren` does both jobs with one number: a row of columns arrives holding
+two and is never left holding one. A Definition declaring it must accept exactly
+one `structural` type, checked when the editor is constructed — that is the type
+its children are seeded from.
+
+`seed` gives those children their starting props. It may return more objects
+than `minChildren`, and that many are created, up to `maxChildren`. So the
+Preset's icon row arrives holding three icons and can go down to one. With
+fewer objects than `minChildren`, the rest start empty.
+
+`standIn` is for a Block that sits beside others. Without one, a Block that
+renders nothing gets a full-width box on the Canvas, which would break a row of
+icons. It is handed what `render` was, and the Canvas marks it as a stand-in.
+
+### Schema entries
+
+| Field          | Type                                          | Required | What it is                                                                                                                                                                  |
+| -------------- | --------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `kind`         | `string`                                      | Yes      | Which control to draw. Your choice of name.                                                                                                                                 |
+| `label`        | `string`                                      | Yes      | Shown next to the control.                                                                                                                                                  |
+| `defaultValue` | `TValue`                                      | Yes      | Where it lands when nobody has set it.                                                                                                                                      |
+| `constraints`  | `Record<string, unknown>`                     | No       | Passed to your control untouched.                                                                                                                                           |
+| `mobile`       | `(value, rootProps) => Record<string,string>` | No       | Opts the prop in to Mobile Overrides.                                                                                                                                       |
+| `follows`      | `string`                                      | No       | A root prop to take the colour from when the Block stores none. See [Colours that follow the email](/guides/custom-blocks/#colours-that-follow-the-email).                  |
+| `primary`      | `true`                                        | No       | On an `asset` prop: this is the picture the Block _is_. See [One picture a Block is](/guides/images/#one-picture-a-block-is-any-number-it-holds).                           |
+| `box`          | `string`                                      | No       | The Box this prop is one side of, such as `"padding"`. Set with `side`. See [Boxes](/guides/inspector/#boxes).                                                              |
+| `side`         | `BoxSide \| BoxSide[]`                        | No       | Which side of `box` it is: `"top"`, `"right"`, `"bottom"` or `"left"`, or several. One prop per side.                                                                       |
+| `on`           | `string`                                      | No       | On a colour: the Surface prop on the same Block it is drawn on, such as a button's fill. See [What text is read against](/guides/custom-blocks/#what-text-is-read-against). |
+| `agent`        | `JSONSchema \| false`                         | No       | What your agent is told the prop holds, or `false` to close it to agents. See [Describing your Blocks](#describing-your-blocks).                                            |
+| `clients`      | `MailClientNote[]`                            | No       | What mail clients do with the value: `{ client, when, note }`. See [Mail Client Notes](/guides/inspector/#mail-client-notes).                                               |
+| `advanced`     | `true`                                        | No       | A setting your users rarely need. Fold it away by default. See [Folding advanced settings](/guides/inspector/#folding-advanced-settings).                                   |
+| `decorative`   | `true`                                        | No       | On an `asset` prop: the image is never shown with alt text, such as a background. See [Decorative images](/guides/images/#decorative-images).                               |
+
+`kind` is an open string. Name your own kinds whatever you like. `SchemaKind`
+holds every kind the shipped Blocks use, so you can spell them the same way:
+
+| Key                   | Value             | What the library does with it          |
+| --------------------- | ----------------- | -------------------------------------- |
+| `SchemaKind.richText` | `"rich-text"`     | Puts the Block's text here.            |
+| `SchemaKind.asset`    | `"asset"`         | Puts a resolved image here.            |
+| `SchemaKind.width`    | `"width"`         | Divides the parent between siblings.   |
+| `SchemaKind.surface`  | `"surface-color"` | Turns an emptied colour into no style. |
+| `SchemaKind.align`    | `"align"`         | Tells your Inspector the direction.    |
+| `SchemaKind.html`     | `"html"`          | Cleans and scopes the markup.          |
+| `SchemaKind.url`      | `"url"`           | Drops a link an email can't carry.     |
+| `SchemaKind.text`     | `"text"`          | Nothing. Passed to your control.       |
+| `SchemaKind.number`   | `"number"`        | Nothing. Passed to your control.       |
+| `SchemaKind.boolean`  | `"boolean"`       | Nothing. Passed to your control.       |
+| `SchemaKind.select`   | `"select"`        | Nothing. Passed to your control.       |
+| `SchemaKind.color`    | `"color"`         | Nothing. Passed to your control.       |
+
+The library reads one prop per Block for each of the first three. The first one
+declared wins. It reads any number of the others. For `SchemaKind.asset` the one
+it reads is the entry marked `primary: true`; any other `asset` prop is
+optional.
+
+`SchemaKind.width` marks a Block's share of its parent, as a percentage. A
+container whose children declare one divides itself between them; one whose
+children do not is left alone. The editor works out what a neighbour can spare
+and puts it in `constraints.max`, and the floor comes from your own
+`constraints.min`. See [`getDivision()`](#reading).
+
+`SchemaKind.surface` marks a colour that may be no colour — a background, a
+band, a button's fill. Type the prop `Surface` and put it straight into a style:
+the library resolves it before `render` sees it, so an emptied surface arrives
+as `undefined` and emits no declaration rather than the word `none`. `NONE` is
+what your Inspector stores to empty one.
+
+A `color` or `surface` entry may list Brand Colours, named colours to offer
+beside the field, as `constraints.brandColors`. Each is a `BrandColor`,
+`{ label, value }`. `brandColorsOf(control.constraints)` reads them back, leaving
+out any that is not a colour that can be written. Store the `value`, never the
+`label`. `describeBlocks` names them in the prop's description for an Agent.
+
+`SchemaKind.align` marks an alignment stored as `"start"`, `"center"` or
+`"end"`. The library only reads it to tell your Inspector which way the email
+runs. A Control Descriptor is the data `getControls()` returns for one prop. On
+an `align` prop it carries `direction`, read off the root's `direction` prop.
+Turning `start` into `left` or `right` is your `render`'s job.
+
+`SchemaKind.html` marks markup your users write by hand. The editor stores it as
+written. `render` receives it cleaned, with every `<style>` rule scoped to the
+class `htmlScopeOf(block.id)`. Put that class on the element round the markup,
+and insert the markup with `dangerouslySetInnerHTML`. Three warnings report what
+cleaning changes. See [`sanitiseHtml`](#markup-written-by-hand).
+
+`SchemaKind.url` marks a link: a value that becomes an `href`. The library
+checks it before `render` sees it. An `http`, `https`, `mailto` or `tel` link, a
+relative path or a fragment arrives as stored. Anything else, like `javascript:`
+or `data:text/html`, arrives as `""`. Put the value straight into an `href`, and
+treat `""` as no link. The library checks only props you declare as
+`SchemaKind.url`.
+
+An unsafe link is also a `url-unsafe` error Diagnostic. So a validated
+`renderDocument` throws `DocumentValidationError` on it.
+
+### What render receives
+
+| Field      | Type                                               | What it is                                                      |
+| ---------- | -------------------------------------------------- | --------------------------------------------------------------- |
+| `block`    | `Block`                                            | The raw node.                                                   |
+| `props`    | `TProps`                                           | Stored props with defaults filled in.                           |
+| `children` | `ReactNode[]`                                      | Already rendered and keyed. Empty for a leaf.                   |
+| `mobile`   | `MobileRenderContext`                              | Phone behaviour. See the responsive guide.                      |
+| `outlook`  | `(element, open, close, between?) => ReactElement` | Markup only classic Outlook reads, round an element's contents. |
+
+`outlook` is for VML, the drawing markup only classic Outlook on Windows reads.
+Hand it an element and two strings of raw markup. Escape anything your users
+wrote before it goes in either string.
+
+On the render path the element's contents become a string between `open` and
+`close`, each inside `<!--[if mso]>`. On the Canvas the element comes back
+unchanged.
+
+`between` is one string per gap between the element's children: `between[i]`
+goes after child `i`, inside `<!--[if mso]>` too. Use it for things Outlook has
+to hold in a table of its own, a cell each. An empty string writes nothing.
+
+`props` is always the desktop values, on both Stages. Mobile is a stylesheet
+over the same markup, not a second rendering.
+
+## The Editor
+
+### Reading
+
+| Method                                    | Returns                 | What it gives you                                          |
+| ----------------------------------------- | ----------------------- | ---------------------------------------------------------- |
+| `getDocument()`                           | `EmailDocument`         | The whole email.                                           |
+| `getBlock(id)`                            | `Block \| undefined`    | One Block.                                                 |
+| `getDefinition(t)`                        | `BlockDefinition?`      | One Definition.                                            |
+| `getDefinitions()`                        | `BlockDefinition[]`     | All of them, in the order you composed them.               |
+| `getControls()`                           | `ControlDescriptor[]`   | The selected Block's editable props. Root if none.         |
+| `getAddableChildren()`                    | `AddableChild[]`        | Children only the selected Block can make.                 |
+| `getEditableChildren()`                   | `EditableChild[]`       | Props of the children the selected Block owns.             |
+| `getDivision()`                           | `Division \| undefined` | How the selected Block's children divide it.               |
+| `canRemove(blockId)`                      | `boolean`               | Whether `removeBlock` would do anything.                   |
+| `canMove(id, parentId, index)`            | `boolean`               | Whether `moveBlock` would do anything.                     |
+| `canDuplicate(blockId)`                   | `boolean`               | Whether `duplicateBlock` would do anything.                |
+| `getDiagnostics()`                        | `Diagnostic[]`          | Everything currently wrong.                                |
+| `getRenderOptions()`                      | `ValidationSetup`       | Hand straight to `renderDocument`.                         |
+| `getSelection()`                          | `string \| undefined`   | The selected Block's id.                                   |
+| `getSelectable(blockId)`                  | `string \| undefined`   | What selecting that Block would select.                    |
+| `getEditing()`                            | `string \| undefined`   | The Block whose text is being typed into.                  |
+| `getHovered()`                            | `string \| undefined`   | The Block under the pointer, on the Canvas or your tree.   |
+| `getPendingChange()`                      | `PendingChange?`        | The drag in flight, if any.                                |
+| `getDocumentWithPendingChange()`          | `EmailDocument`         | What the Canvas shows. Never save it.                      |
+| `getDocumentWithSuggestions()`            | `EmailDocument`         | The email with every open Suggestion in it. Never save it. |
+| `getDocumentWithSuggestions({ without })` | `EmailDocument`         | The same, leaving one Suggestion out.                      |
+| `getStage()`                              | `Stage`                 | `"desktop"` or `"mobile"`.                                 |
+| `getLastAction()`                         | `Action \| undefined`   | How the last change came about, and which Blocks it hit.   |
+
+Every getter here answers with the same value until that value moves, so all of
+them can be selected from directly — see
+[Subscribe to changes efficiently](/guides/subscribing/).
+
+Some Blocks are part of another Block's shape instead of something to drag in,
+such as a column inside a row. They never appear in your palette, your users
+cannot select them, and the Block that owns them is the only way to reach them.
+Two methods cover that, both reading the current selection as `getControls()`
+does.
+
+`getAddableChildren()` is how someone gets another one. It returns
+`{ type, label, add }` for each kind the selected Block can make, and you draw
+the button:
+
+```tsx
+{
+  editor.getAddableChildren().map((child) => (
+    <button key={child.type} onClick={child.add}>
+      Add {child.label.toLowerCase()}
+    </button>
+  ));
+}
+```
+
+`getEditableChildren()` is how someone configures one. It returns one entry per
+child the selected Block owns, shaped
+`{ blockId, label, controls, canRemove, remove }`. The `controls` are ordinary
+`ControlDescriptor`s, so whatever you already wrote for `getControls()` renders
+them unchanged:
+
+```tsx
+{
+  editor.getEditableChildren().map((child, index) => (
+    <fieldset key={child.blockId}>
+      <legend>
+        {child.label} {index + 1}
+      </legend>
+      {child.controls.map((control) => (
+        <Control key={control.name} control={control} />
+      ))}
+      <button disabled={!child.canRemove} onClick={child.remove}>
+        Delete
+      </button>
+    </fieldset>
+  ));
+}
+```
+
+Both return an empty array for most Blocks. `getAddableChildren()` empties for
+one already holding as many children as it allows, so the button disappears at
+the ceiling instead of sitting there doing nothing. Neither `add()` nor
+`remove()` moves the selection, so the panel survives its own click.
+
+`getDivision()` is the third, for children that divide the Block between them —
+the columns of a row. It returns `{ parentId, prop, shares }`, or `undefined`
+when the children divide nothing, which is almost every Block. Each entry in
+`shares` is one child:
+
+| Field             | What it is                                                               |
+| ----------------- | ------------------------------------------------------------------------ |
+| `blockId`         | Which child.                                                             |
+| `width`           | Its share right now, as a percentage.                                    |
+| `floor`           | The narrowest it may be.                                                 |
+| `ceiling`         | The widest it may be, given the siblings it has today.                   |
+| `widthsIf(value)` | Every share if this one were set there. Writes and shows nothing.        |
+| `preview(value)`  | Show it set there on the Canvas. Returns the same widths. Saves nothing. |
+| `commit()`        | Save what was last previewed, both widths as one undo step.              |
+| `cancel()`        | Drop the drag. Nothing is saved.                                         |
+| `set(value)`      | Set it. Its neighbour moves with it, as one undo step.                   |
+
+The shares always come to a hundred, so a row you draw from them is a row that
+adds up. `ceiling` is tighter than the prop's own maximum, because a share only
+grows as far as its neighbour can shrink — offer a slider the full hundred and
+it will stop moving the email part of the way along.
+
+`preview` opens a Pending Change with both widths. A Pending Change is a value
+your users are dragging and have not let go of yet (see
+[Dragging a value](#dragging-a-value)).
+
+So the real columns on the Canvas move while your users drag. `preview` also
+returns the widths, so your strip moves with them. It is the same arithmetic
+`set` uses, so neither can show a split the release would refuse:
+
+```tsx
+const share = editor.getDivision().shares[index];
+
+// While dragging the boundary after child `index`:
+setShares(share.preview(percentFromPointer));
+// On release:
+share.commit();
+// If the drag is called off:
+share.cancel();
+```
+
+`preview` and `set` clamp for you. A drag that ends where it began saves
+nothing, so it costs no undo step and needs no guard of your own. Use `set` for
+a one-off change, like an arrow key.
+
+Use `widthsIf` when you only want the numbers, with nothing shown on the Canvas.
+
+`prop` names the prop the children divide by — use it to leave that one out of
+the `controls` you render, when the strip is already how someone sets it.
+
+`getDivision()` returns `undefined` on the mobile stage. A share there would be
+a mobile override, and columns stack to the full width of the phone anyway.
+
+`select()` already knows about them, so clicking a column selects its row
+wherever the click came from, whether that is the canvas or a tree panel of your
+own. You only need `getSelectable(blockId)` when you are drawing something
+_before_ the click: a hover outline, or a row that should look like it is not a
+target. It hands back the id you gave it for almost everything, the owner's id
+for a Block that belongs to another, and `undefined` for one it has never heard
+of.
+
+```tsx
+const owned = editor.getSelectable(block.id) !== block.id;
+```
+
+`canRemove(blockId)` answers a different question from a Definition's
+`deletable`. That is permanent and about the type, which is what a padlock icon
+reports. This is about one Block where it currently sits, and returns `false`
+for a column that is merely the last one its row can spare.
+
+### Changing
+
+Each returns whether it did anything, so you can disable a button instead of
+offering an action that will be refused.
+
+| Method                                              | Returns               |
+| --------------------------------------------------- | --------------------- |
+| `setProp(blockId, prop, value)`                     | `boolean`             |
+| `clearMobileOverride(blockId, prop \| props)`       | `boolean`             |
+| `insertBlock(type, parentId, index?, props?)`       | `string \| undefined` |
+| `moveBlock(blockId, toParentId, toIndex, { via? })` | `boolean`             |
+| `duplicateBlock(blockId)`                           | `string \| undefined` |
+| `removeBlock(blockId)`                              | `boolean`             |
+| `select(blockId \| undefined, { via? })`            | `boolean`             |
+| `edit(blockId \| undefined)`                        | `boolean`             |
+| `hover(blockId \| undefined)`                       | `boolean`             |
+| `setStage(stage)`                                   | `void`                |
+| `reveal(blockId)`                                   | `void`                |
+| `applyRepair(repair)`                               | `boolean`             |
+
+On the mobile Stage, `setProp` writes a Mobile Override and leaves the desktop
+value alone, but only for a prop whose Schema opted in.
+
+An `asset` prop may list pictures you already host, in `constraints.options`
+as `{ label, asset }`. `setProp` takes one of those with no image request. It
+refuses any other new picture on that prop, which has to come through
+`replaceImage`. Changing the alt text of the picture already there, and
+clearing it, still work. `createEditor` throws `EditorConfigurationError` if a
+listed picture has no `src`, or a width or height that is not above zero. See
+[Pictures you already host](/guides/images/#pictures-you-already-host).
+
+`edit()` puts the caret in a Block's text, and selects that Block. It returns
+`false` for a Block with no rich-text prop, and for one your users cannot
+select. Pass `undefined` to leave the text. The Block stays selected.
+
+A Block being edited cannot be dragged, so only one Block is ever editable at a
+time. Selecting anything else leaves the text for you. See
+[Let people type formatted text](/guides/rich-text/).
+
+`hover()` says which Block the pointer is over. The `Canvas` calls it as the
+pointer moves, and the `hover` Slot draws whatever `getHovered()` says. So your
+own tree can share hover with the Canvas both ways:
+
+<Code code={hoverRow} lang="tsx" title="hover-row.tsx" />
+
+Like `select()`, it lands where a click would, so a column hovers its row. The
+root hovers nothing, as on the Canvas. It returns `false` for a Block that is
+not in the Document, and hover stays put.
+
+Hover is not an Action and not in History. `subscribe` listeners are not told,
+so nothing animates on every pointer move. Listen with `subscribeToHover`.
+`useEditorState` wakes on it for you.
+
+### Dragging a value
+
+A Pending Change is a value your users are dragging and have not let go of yet.
+The Canvas shows it, but the Document does not hold it. When the drag ends it
+becomes one ordinary change: one Op and one undo step.
+
+| Method                                   | Returns   |
+| ---------------------------------------- | --------- |
+| `setPendingChange(blockId, { prop: v })` | `boolean` |
+| `commitPendingChange()`                  | `boolean` |
+| `cancelPendingChange()`                  | `boolean` |
+
+`setPendingChange` sends no Op and wakes no `subscribe` listener. `getDocument()`,
+`getControls()` and `getDiagnostics()` keep the saved value.
+
+`setPendingChange` returns `false` for anything `setProp` would refuse, and for a prop
+the Schema does not have. On the mobile Stage it also refuses a prop with no
+phone-only value. If it refuses any prop you pass, it opens nothing.
+
+Pass several props to drag them together, like a "link all sides" padding
+control:
+
+```ts
+editor.setPendingChange(blockId, {
+  paddingTop: v,
+  paddingRight: v,
+  paddingBottom: v,
+  paddingLeft: v,
+});
+```
+
+They commit as one undo step, with one Op for each prop that changed. Calling
+`setPendingChange` again on the same Block replaces the props it holds. It does not add
+to them.
+
+`commitPendingChange()` writes the change. A drag that ends where it started
+writes nothing. `cancelPendingChange()` drops it, with nothing to undo. Both
+return `false` when nothing is pending.
+
+Only one Pending Change is open at a time. If your users do anything else
+before letting go, the dragged value is kept. It is written first, as its own
+undo step, and then their action runs.
+
+That covers selecting, inserting, deleting, duplicating, moving, switching
+Stage, setting or resetting any prop, typing, and carrying out a
+[`Repair`](#diagnostics-and-repairs). Calling `setPendingChange` on another
+Block counts too, and so does a control's `preview(v)` on another prop.
+
+Undo mid-drag writes the drag, then undoes it, so the old value comes back.
+Redo then brings the dragged value back. Redo mid-drag writes the drag too,
+which is a new edit, so there is nothing left to redo.
+
+`getPendingChange()` returns a `PendingChange`: the `blockId` and the `ops` a
+commit would write. It is the same object until the drag moves.
+
+`getDocumentWithPendingChange()` is for your own live preview pane. Do not
+save it: save `getDocument()` or the Op stream. With nothing pending it is the
+same object as `getDocument()`.
+
+Each `ControlDescriptor` has the same three as `preview(v)`, `commit(v?)` and
+`cancel()`. Wire your control's live event to `preview` and its end event to
+`commit`. With nothing pending, `commit(v)` is `set(v)`.
+
+### Suggesting a change
+
+A Suggestion is a change shown to your users before it is made. It is how your
+agent changes an email. Your users accept it whole, as one undo step, or reject
+it and nothing is left behind.
+
+<Code code={suggestAChange} lang="ts" title="suggest-a-change.ts" />
+
+| Method                       | Returns                           |
+| ---------------------------- | --------------------------------- |
+| `suggest(edits, options?)`   | `Suggestion \| SuggestionRefusal` |
+| `getSuggestions()`           | `Suggestion[]`                    |
+| `getSuggestionsAt(blockId)`  | `Suggestion[]`                    |
+| `subscribeToSuggestions(fn)` | `Unsubscribe`                     |
+
+`suggest` takes a list of [`Edit`](#diagnostics-and-repairs)s. It sends no Op,
+adds no undo step and wakes no `subscribe` listener. `getDocument()` and
+`getDiagnostics()` stay as they were.
+
+Edits can set props, and insert, remove and move Blocks. You place an insert
+or a move with `after`, `before` or `parent`, never with an index.
+
+Each Edit reads the email the ones before it left. Give an insert an `id`, and
+later Edits in the same list can name the new Block.
+
+If any Edit can't be carried out now, `suggest` shows nothing. It returns a
+`SuggestionRefusal`: `{ status: "refused", reasons }`. With an empty list,
+`reasons` is empty.
+
+Each `EditRefusal` in `reasons` has the `index` of the Edit, a `code` and a
+`message`. Send them back to your agent so it can try again.
+
+| `code`                                             | When                                                   |
+| -------------------------------------------------- | ------------------------------------------------------ |
+| `"malformed"`                                      | It isn't an Edit, or a field is missing.               |
+| `"missing-block"`                                  | No Block has an id it names.                           |
+| `"unregistered-block"`                             | The Block's type has no Block Definition.              |
+| `"unknown-type"`                                   | No Block Definition has the type.                      |
+| `"duplicate-id"`                                   | An insert's `id` is taken, or another Suggestion's.    |
+| `"no-place"`                                       | No place, or one that contradicts itself.              |
+| `"not-accepted"`, `"at-capacity"`, `"own-subtree"` | The parent won't take it, the same as a drop.          |
+| `"at-minimum"`                                     | It would leave a container below its `minChildren`.    |
+| `"not-deletable"`, `"is-root"`                     | That Block can't be removed or moved.                  |
+| `"unknown-prop"`                                   | The Schema has no such prop.                           |
+| `"closed-prop"`                                    | The prop is closed to agents, or not described.        |
+| `"wrong-shape"`                                    | The value is the wrong shape for its kind.             |
+| `"unlisted-asset"`                                 | The Asset prop lists its pictures, and this isn't one. |
+| `"not-a-width"`                                    | A width in a row, set to anything but a number.        |
+
+`EditRefusalCode` is the type of `code`. The editor holds a Suggestion to more
+than `setProp`: only props the Schema has, and each value the right shape.
+
+An Asset is a resolved image: `src`, `width`, `height` and maybe `alt`. An
+Asset prop in a Suggestion takes a whole Asset, never a URL string.
+
+A `Suggestion` has an `id`, its `edits`, a `note` and your own `meta`. The
+editor stores `meta` and hands it back, but never reads it. `status` is
+`"streaming"`, `"open"` or `"stale"`.
+
+`diagnostics` are the Diagnostics the email would have after accepting. They
+never block `accept()`: your users could make the same change by hand.
+
+`touches` lists each Block it changes, as a `SuggestionTouch`:
+`{ blockId, change, props }`. `change` is `"insert"`, `"remove"`, `"move"` or
+`"set"`. `props` are the props it sets on that Block.
+
+It waits while your users select other Blocks and make other edits. Several
+can be open at once. An Edit with no `stage` writes on the Stage the editor
+showed when you called `suggest`.
+
+A Suggestion that waits can't overwrite your users' work. It goes **stale**
+when anyone sets a prop it sets, or removes or moves a Block it touches. A
+change to a different prop on the same Block leaves it open.
+
+"Anyone" means your users, a peer's Ops through `applyExternalOps`, or
+accepting another Suggestion. A Suggestion also goes stale if it no longer
+applies at all.
+
+A stale Suggestion stays in `getSuggestions()`, as a new object with `status:
+"stale"`. It is no longer drawn in `getDocumentWithSuggestions()`. It never
+opens again, even if the change is undone.
+
+`accept()` writes ordinary Ops with the editor's own `origin`, as one undo
+step. An open Pending Change is written first, as its own step. Edits that
+change nothing write nothing.
+
+`accept()` returns an `AcceptOutcome`. `"accepted"` means it was written.
+`"stale"` and `"gone"` say why nothing was written: it went stale, or it was
+already accepted or rejected. `"streaming"` means it isn't finished yet. Then
+nothing is written at all, not even a Pending Change.
+
+On `"stale"` or `"gone"`, the editor still stores an open Pending Change.
+`reject()` works on a stale or streaming Suggestion too, and leaves nothing to undo. It returns `false` once
+the Suggestion is gone.
+
+#### The Suggestion in front
+
+`getSuggestionsAt(blockId)` lists the Suggestions that touch one Block. Ones
+you can accept come first, then streaming ones, then stale ones. Within each,
+the newest comes first.
+
+The first of these for the selected Block is the one your users are deciding
+on, if its `status` is `"open"`. Read it from here for your accept key, your
+card and your fields, and they always agree. There is no separate "focused
+Suggestion" to keep in step with the selection.
+
+It returns the same array until a Suggestion comes, goes or changes, so you
+can select from it directly.
+
+Each Control Descriptor carries `suggested`, the value this Suggestion would
+set it to. See [Suggestions in the fields](/guides/inspector/#suggestions-in-the-fields).
+
+#### Streaming a Suggestion
+
+A first draft can show while your agent is still writing it. Pass
+`streaming: true` to `suggest`. It may start with no Edits. Its `status` is
+`"streaming"`.
+
+<Code code={streamASuggestion} lang="ts" title="stream-a-suggestion.ts" />
+
+`extend(edits)` adds Edits to the end, and returns the grown `Suggestion`.
+The new Edits can name Blocks the earlier ones inserted. Each extend tells
+`subscribeToSuggestions` listeners, so your Canvas redraws as it grows.
+
+If any new Edit can't apply, `extend` returns a `SuggestionRefusal`. Each
+`index` points into the Edits you just passed. The Suggestion keeps what it
+had, and you can extend it again.
+
+`extend` returns an `ExtendOutcome`. Besides the two above, it can be a
+string. Then the Suggestion no longer grows, so stop your agent.
+
+| `ExtendOutcome` | Why it no longer grows              |
+| --------------- | ----------------------------------- |
+| `"finished"`    | You already called `finish()`.      |
+| `"stale"`       | Your users changed what it touches. |
+| `"gone"`        | It was accepted or rejected.        |
+
+`finish()` makes it `"open"`, so your users can accept it. It returns a
+`FinishOutcome`: `"open"`, `"stale"` or `"gone"`.
+
+Until then, `accept()` returns `"streaming"`. Your users can reject it at any
+time. Accepted, the whole Suggestion is one undo step.
+
+#### Saving and restoring
+
+`toJSON()` gives you a `SuggestionJSON`: the `edits`, `note` and `meta`, plus
+the `stage` and a `base`. The `base` records what each Block it touches looked
+like when it was suggested. It is plain data, so you can save it anywhere.
+
+To restore it, pass it back as the options: `suggest(json.edits, json)`. It
+comes back `"open"` if it still fits, and `"stale"` if someone changed what it
+touches since.
+
+If a Block it touches is gone, it comes back stale instead of refused. It has
+no `diagnostics` then. One saved stale comes back stale, since a stale
+Suggestion never opens again. One saved while streaming comes back streaming.
+Call `finish()` or `reject()` on it.
+
+`toJSON()` saves the object you call it on. After `extend` or `finish`, call
+it on the new one, or on what `getSuggestions()` holds.
+
+`subscribeToSuggestions(fn)` calls `fn` with a `SuggestionEvent`:
+
+| `kind`      | Also carries                                       |
+| ----------- | -------------------------------------------------- |
+| `"suggest"` | `suggestion`                                       |
+| `"extend"`  | `suggestion`, grown.                               |
+| `"finish"`  | `suggestion` with `status: "open"`.                |
+| `"accept"`  | `suggestion` with `status: "accepted"`, and `ops`. |
+| `"reject"`  | `suggestion` with `status: "rejected"`.            |
+| `"stale"`   | `suggestion` with `status: "stale"`.               |
+
+The accept event is the one place that says your agent made the change. Use it
+for an audit log. `SuggestOptions` holds `note`, `meta`, `streaming`, and the
+`stage` and `base` a restore passes. `SuggestionStatus` is the type of `status`.
+
+`getDocumentWithSuggestions()` is for drawing. Do not save it. With nothing
+open it is the same object as `getDocument()`. Pass `{ without: id }` to leave
+one Suggestion out, as though it had never come.
+
+#### Describing your Blocks
+
+Your agent can only set a prop it knows the shape of. `describeBlocks` tells it,
+as JSON Schema. Pass it your Block Definitions:
+
+```ts
+import { describeBlocks } from "lekh";
+
+const blocks = describeBlocks(editor.getDefinitions());
+// [{ type: "button", label: "Button", props: { type: "object", ... },
+//    parents: ["email", "column"] }, ...]
+```
+
+Each `BlockDescription` has the Block's `type` and `label`, its `props` as one
+JSON Schema object, and the `parents` that take it as a child.
+
+The library describes every `SchemaKind` for you, so the shipped Blocks need
+nothing extra. Each prop says its kind's shape, its range or options, and its
+default. A rich-text prop lists the tags it allows. An Asset prop asks for a
+whole Asset, never a URL.
+
+A kind you made up yourself is closed until you describe it. Give its Schema
+entry an `agent` field holding a JSON Schema:
+
+```ts
+productId: {
+  kind: "product-picker",
+  label: "Product",
+  defaultValue: "",
+  agent: { type: "string", description: "A product SKU, like SKU-1042." },
+},
+```
+
+`agent: false` closes any prop, such as a legal footer your users must write by
+hand. A closed prop is left out of `props`. A Suggestion that sets it, or
+inserts a Block with it, is refused with `"closed-prop"`.
+
+An `agent` field on a library kind replaces the library's description. The
+editor still checks the value against the kind. `JSONSchema` is the type of the
+field: any JSON Schema, as plain data.
+
+### Undo
+
+| Method      | Returns   | What it does                              |
+| ----------- | --------- | ----------------------------------------- |
+| `undo()`    | `boolean` | Step back one **action**, not one Op.     |
+| `redo()`    | `boolean` | Step forward.                             |
+| `canUndo()` | `boolean` | Whether undo would actually do something. |
+| `canRedo()` | `boolean` | Same, forwards.                           |
+
+`canUndo()` reports what undo would really find, not merely whether anything
+was ever recorded.
+
+### Listening
+
+| Method                         | Called                                                                           |
+| ------------------------------ | -------------------------------------------------------------------------------- |
+| `subscribe(fn)`                | Once per action, after everything has settled.                                   |
+| `onOp(fn)`                     | Once per Op, in order. Good for saving patches.                                  |
+| `onReveal(fn)`                 | When a Block should be scrolled into view.                                       |
+| `subscribeToPendingChange(fn)` | When a Pending Change opens, moves, commits or is dropped.                       |
+| `subscribeToSuggestions(fn)`   | When a Suggestion is made, grows, finishes, goes stale, is accepted or rejected. |
+| `subscribeToHover(fn)`         | When the hovered Block changes.                                                  |
+
+All six return an `Unsubscribe`. On a commit they run in this order: Op
+listeners, `subscribe` listeners, pending listeners, Suggestion listeners, hover
+listeners, then reveal. Hover listeners come in only when a commit took the
+hovered Block away.
+
+#### Knowing what just happened
+
+An Action is one thing done to the editor: a drop, an undo, a Command, a click
+that selects, a peer's change arriving. Read the last one inside a `subscribe`
+listener to decide what to animate.
+
+<Code code={lastAction} lang="ts" title="last-action.ts" />
+
+| Field      | What it holds                                                                               |
+| ---------- | ------------------------------------------------------------------------------------------- |
+| `via`      | `"pointer"`, `"command"`, `"history"`, `"api"` or `"remote"`.                               |
+| `blocks`   | Every Block whose props, text or place changed. A Block added or removed whole counts once. |
+| `inserted` | The Blocks this Action added. They are in `blocks` too.                                     |
+
+The `Canvas` says `"pointer"` for a click or a drop. Commands say `"command"`.
+Undo and redo say `"history"`, even from a Command. Ops from
+`applyExternalOps` say `"remote"`. Anything else is `"api"`.
+
+Selecting from your own tree or list? Pass `select(id, { via: "pointer" })`, so
+the click animates like one on the Canvas. Moving from your own "Move to…"
+menu? Pass `moveBlock(id, parentId, index, { via: "command" })`, so it
+animates like Move up.
+
+Undoing text counts, and names its Block. Hovering does not, and nor does a
+drag that has not been let go. The same object comes back until the next
+Action, and it is `undefined` before the first.
+
+`reveal(blockId)` asks for a Block to be scrolled into view, and is what fires
+`onReveal`. Call it yourself from a tree row or a search result. The
+library calls it for you only when a Block arrives somewhere the Author was not
+looking — a restored required Block, or an image that landed after an upload
+they had stopped watching. A Block dropped where they were already looking
+needs no scrolling and gets none.
+
+It is answered by the `Canvas`, which scrolls the Block into view itself.
+Subscribe only to react to one — a highlight, a focus move, a tree row to
+expand. It fires **before** your framework has painted, so defer a frame before
+looking the Block up:
+
+```ts
+editor.onReveal((blockId) => {
+  requestAnimationFrame(() => highlight(blockId));
+});
+```
+
+### Dragging and dropping
+
+| Method                               | What it does                                         |
+| ------------------------------------ | ---------------------------------------------------- |
+| `canInsert(type, parentId)`          | Whether the nesting rules allow it.                  |
+| `resolveDropTarget(query)`           | Where a drag would land right now.                   |
+| `getDropTargets(query)`              | Every place a drag may land.                         |
+| `explainDropRefusal(parentId, type)` | Why a container turned a Block down.                 |
+| `place(intent)`                      | Put a Block in, asking for an image first if needed. |
+| `getImageBlockType()`                | Which type a dropped file becomes.                   |
+
+`resolveDropTarget` is pure. It measures nothing and touches no DOM, so you can
+test drag behaviour without a layout engine. You supply the measurements:
+
+```ts
+function resolveDropTarget(query: DropTargetQuery): DropOutcome;
+```
+
+A `DropTargetQuery` is what the drag looks like right now.
+
+| Field            | Type                   | Default | What it does                                    |
+| ---------------- | ---------------------- | ------- | ----------------------------------------------- |
+| `draggedType`    | `string`               | —       | The Block type in the air.                      |
+| `pointer`        | `Point`                | —       | `{ x, y }`, in your coordinate space.           |
+| `rects`          | `readonly BlockRect[]` | —       | Every measured Block: id, top, left, w, h.      |
+| `draggedBlockId` | `string`               | —       | Set when moving a Block rather than adding one. |
+
+`BlockRect` and `Point` carry no units and name no coordinate system. Whatever
+space you measured in is the space the answer comes back in.
+
+#### Reading the outcome
+
+A `DropOutcome` is three states, not a target-or-nothing:
+
+```ts
+type DropOutcome =
+  | { status: "landing"; target: DropTarget }
+  | { status: "refused"; refusal: DropRefusal }
+  | { status: "elsewhere" };
+```
+
+`elsewhere` and `refused` are different events and want different chrome.
+`elsewhere` means the pointer is not over the email, which is how somebody
+cancels a drag. `refused` means a container said no, and that is the only one
+worth telling them about.
+
+A `DropTarget` carries an `axis` of type `LayoutAxis` — `"vertical"` or
+`"horizontal"` — inferred from where the children actually sit rather than
+declared by a Definition. `before` and `after` mean above and below on a
+vertical axis, and left and right on a horizontal one. So an indicator drawn
+for a horizontal parent is a vertical line down the edge of the reference
+Block. Absent means read it as vertical.
+
+#### Every place a drag may land
+
+Ask for the whole list when a drag starts, so you can show every place before
+the pointer picks one:
+
+```ts
+function getDropTargets(query: DropTargetsQuery): DropTarget[];
+```
+
+A `DropTargetsQuery` is `draggedType` and `draggedBlockId`, as above, with no
+pointer. Pass `rects` too and each target gets its `axis`.
+
+It uses the same three refusals as `resolveDropTarget`. So a place in the list
+is never one a drop would be refused at. A move never lists a place inside the
+Block being moved. Dragging a Section lists only the gaps between Sections.
+
+Each gap is listed once: before each child, then after the last. An empty
+container is one target, `inside` it. `resolveDropTarget` names a gap from
+whichever neighbour the pointer is nearer, so compare the two by `parentId` and
+`index`.
+
+A place can be in the list and still be hard to reach with the pointer. The gap
+between two Sections that both take text is one: the pointer is always inside
+one of them first.
+
+#### Saying why, in your own words
+
+A `DropRefusal` is shaped like a Diagnostic on purpose: a stable code to branch
+on, a message to fall back to, and the Block it concerns.
+
+| Field     | Type              | What it is                                |
+| --------- | ----------------- | ----------------------------------------- |
+| `code`    | `DropRefusalCode` | Which of the three refusals this is.      |
+| `message` | `string`          | Fallback text, composed from both labels. |
+| `blockId` | `string`          | The container that refused.               |
+
+`DropRefusalCode` is the whole list, and it is three long:
+
+| Code             | What happened                                      |
+| ---------------- | -------------------------------------------------- |
+| `"not-accepted"` | The container's `accepts` does not name this type. |
+| `"at-capacity"`  | It is full — `maxChildren` is already reached.     |
+| `"own-subtree"`  | You are dropping a Block inside itself.            |
+
+Branch on `code` and write your own sentence. `message` exists so that a code
+added later still says something sensible rather than nothing.
+
+The same question comes up when there is no drag in flight — a palette entry
+that should look disabled, or the moment after `place` reported `refused`:
+
+```ts
+function explainDropRefusal(
+  parentId: string,
+  type: string,
+  movedBlockId?: string,
+): DropRefusal | undefined;
+```
+
+`undefined` means the parent would take it.
+
+#### PlaceOutcome
+
+`place(intent)` takes a `PlacementIntent` and returns one of three:
+
+```ts
+type PlaceOutcome =
+  | { status: "inserted"; blockId: string }
+  | { status: "requested" }
+  | { status: "refused" };
+```
+
+`requested` means an image was asked for and **nothing is in the Document yet**.
+The Block appears if and when an Asset arrives, and never if the person
+cancels. Treat it as pending, not as done.
+
+### Images
+
+`replaceImage(blockId, reason?, prop?)` asks for a new image for a Block that
+is already placed. Pass `"add"` or `"replace"`, or nothing. The request says
+`"add"` if the prop is empty and `"replace"` if it holds a picture. `prop` defaults to the Block's Primary Asset. Name another
+`asset` prop to set an optional one, such as a section's background.
+
+`getImageRequests()` returns every resolution still outstanding.
+
+Both work in `ImageRequestState`, which is a union of two:
+
+```ts
+type ImageRequestState = PendingImage | FailedImage;
+```
+
+None of it is in the Document. That is what makes a Document safe to persist at
+any moment, including halfway through an upload.
+
+| Type           | Carries                                                                |
+| -------------- | ---------------------------------------------------------------------- |
+| `PendingImage` | `status: "pending"`, `progress?` from 0 to 1, `cancel()`.              |
+| `FailedImage`  | `status: "failed"`, the `error` the resolver rejected with, `retry()`. |
+
+Both extend `ImageRequestFacts`, which is the part that says what the request
+is about:
+
+| Field       | Type                 | What it is                                |
+| ----------- | -------------------- | ----------------------------------------- |
+| `reason`    | `ImageRequestReason` | Why it was raised.                        |
+| `files`     | `readonly File[]`    | What the person supplied. Empty for most. |
+| `placement` | `ImagePlacement`     | Where the resolved Asset will land.       |
+
+`ImageRequestReason` is `"insert"`, `"add"`, `"replace"`, `"drop"` or
+`"paste"`. `"add"` means an empty `asset` prop is getting its first picture.
+`"replace"` means a picture is already there. One resolver serves them all, so
+you have one place to decide policy: open a gallery for one reason, upload
+straight away for another.
+
+`files` being non-empty does not mean upload. If your images already live in a
+digital asset manager, hand them to its upload tab, or ignore them.
+
+`ImagePlacement` says where it is going: `{ kind: "insert", type, target }` for
+a Block that does not exist yet, or `{ kind: "replace", blockId, prop, decorative }` for one
+that does. `prop` is the `asset` prop the picture lands in. `decorative` is
+`true` when that prop's Schema entry is marked `decorative`: the picture is
+never shown with alt text, so don't ask for any.
+
+See [Handle images and uploads](/guides/images/).
+
+### Working with other people
+
+`applyExternalOps(ops)` applies changes made elsewhere. They never enter your
+local undo stack, and conflicts resolve last-write-wins in arrival order.
+
+A change from elsewhere does not stop a drag your users are in, even on the
+same prop. Their drag keeps showing and wins when they let go. Undo then goes
+back to the other person's value.
+
+If someone else removes the Block, or a Block it sits in, the editor drops the
+Pending Change and tells your pending listeners.
+
+Ops carry an `origin` so you can tell your own edits apart. Yours default to
+`LOCAL_ORIGIN` (`"local"`).
+
+## Commands
+
+```ts
+import { createCommands } from "lekh";
+
+const commands = createCommands(editor);
+commands.duplicate();
+```
+
+Eleven named actions, as methods: `undo`, `redo`, `delete`, `duplicate`,
+`moveUp`, `moveDown`, `stopEditing`, `stepOut`, `selectFirstChild`,
+`selectPrevious`, `selectNext`. `CommandName` is the union of those names.
+`Commands` is the object.
+
+Each returns a `boolean` saying whether it did anything.
+
+To ask before running one, use `commands.can`. It has the same eleven names,
+and each says whether that command would do anything right now. It uses the
+same rule the command uses, so the two never disagree. Asking changes nothing.
+
+```tsx
+<button disabled={!commands.can.moveUp()} onClick={commands.moveUp}>
+  Move up
+</button>
+```
+
+`can.undo` and `can.redo` are `editor.canUndo()` and `editor.canRedo()`.
+
+`delete`, `duplicate`, `moveUp` and `moveDown` act on the current selection.
+They do nothing when there is none. `moveUp` does nothing on a first child, and
+`moveDown` on a last one. `delete` does nothing for a Block that can't be
+removed, and `duplicate` where the parent is full.
+
+`stopEditing` takes the caret out of a Block's text and leaves that Block
+selected. It does nothing when nobody is typing.
+
+The last four move the selection around the tree:
+
+- `stepOut` backs out one level. First it leaves the text, then it selects the
+  parent, and at the top it clears the selection. It never selects the root.
+- `selectFirstChild` selects the first Block inside the selected one. With
+  nothing selected, it selects the email's first Block. On a text Block with
+  nothing inside, it starts typing instead.
+- `selectPrevious` and `selectNext` select the Block before or after, inside
+  the same parent. They do nothing at either end, or with nothing selected.
+
+A Structural Block is one its parent creates and owns, like a column in a row.
+These four never land on one. They pass through it to its owner or its
+children. So stepping out of a Block in a column selects the row, and the
+Blocks in a row's columns count as one list, column after column.
+
+No React and no DOM, so it runs anywhere the editor does. Inside React, use
+[`useCommands`](/reference/canvas/#commands) from `lekh/canvas`.
+
+## Ops
+
+Five kinds: `set-prop`, `insert`, `remove`, `move`, `text-edit`.
+
+Each carries what it replaced, which is what makes undo work. A `text-edit` is
+only a marker. The text itself lives on the Block, not in the Op log.
+
+Types: `Op`, `SetPropOp`, `InsertOp`, `RemoveOp`, `MoveOp`, `TextEditOp`.
+
+## Diagnostics and repairs
+
+`Diagnostic` carries a `code`, a `message`, a `severity`, an optional `blockId`
+and an optional `repair`.
+
+A `Repair` is **data describing** a change, not the change itself.
+`editor.applyRepair(repair)` is the only thing that carries one out.
+
+```ts
+type Repair = KnownRepair | ConsumerRepair;
+type KnownRepair = Edit | RestoreRequiredBlockRepair;
+```
+
+`KnownRepair` is what the library describes and can perform itself: an `Edit`,
+or a kind named for what it means.
+
+An `Edit` is one change to a Document. It names Blocks by id, never by
+position, so it still means the same thing later or is refused.
+
+```ts
+type Edit =
+  | { kind: "set-prop"; blockId; prop; value; stage? }
+  | { kind: "insert"; type; id?; after?; before?; parent?; props? }
+  | { kind: "remove"; blockId }
+  | { kind: "move"; blockId; after?; before?; parent? };
+```
+
+`after` or `before` puts a Block beside a sibling. `parent` alone puts it at
+the end of that Block. An insert may name its new Block with `id`.
+
+`RestoreRequiredBlockRepair` is `{ kind: "restore-required-block", type }`. It
+is named for the intent rather than spelled out as steps, because the steps
+carry policy: it appends to the root, then selects and reveals, since a
+compliance repair must never happen off-screen. A step list would make that
+something the author of a repair could forget.
+
+`SetPropRepair` is the `set-prop` Edit:
+`{ kind: "set-prop", blockId, prop, value, stage? }`. No more general than
+`setProp` already is. Leave out `stage` to write on the Stage the editor is
+showing, or name `"desktop"` or `"mobile"`.
+
+`ConsumerRepair` is yours, with any `kind` you like, attached by your own
+Validators. Run your switch first and make `applyRepair` its default branch.
+That ordering means a kind the library adds later can never quietly take over
+one of yours. `applyRepair` returns `false` for a kind it does not recognise.
+
+The built-in codes live on one object, `DiagnosticCode`. Each key is its code
+in camelCase, and each code names its subject first:
+
+```ts
+DiagnosticCode.blockUnregistered; // "block-unregistered"
+DiagnosticCode.requiredBlockMissing; // "required-block-missing"
+DiagnosticCode.htmlMarkupRemoved; // "html-markup-removed"
+DiagnosticCode.htmlMarkupUnbalanced; // "html-markup-unbalanced"
+DiagnosticCode.htmlWholeDocument; // "html-whole-document"
+DiagnosticCode.propWrongShape; // "prop-wrong-shape"
+DiagnosticCode.urlUnsafe; // "url-unsafe"
+```
+
+A `Validator` receives a `ValidationContext` alongside the Document — the
+Definitions in play, so a check can ask what a Block is meant to be, and the
+root's resolved props. A Block Definition's own `validate` gets the same
+context:
+
+```ts
+interface ValidationContext {
+  getDefinition(type: string): BlockDefinition | undefined;
+  readonly definitions: readonly BlockDefinition[];
+  readonly rootProps: Readonly<Record<string, unknown>>;
+}
+```
+
+Read `rootProps` when a prop you check `follows` one of the root's, an Email
+Default. A Block that stores no value of its own takes the root's, so that is
+the value your users see.
+
+## Rich text
+
+`RichText` renders a rich-text prop: editable text on the canvas, and
+email-safe inline markup on the render path. You write the Definition once.
+
+It takes `RichTextProps`:
+
+```ts
+interface RichTextProps {
+  readonly value: unknown;
+  readonly linkColor?: string;
+  readonly paragraphStyle?: CSSProperties;
+  readonly paragraphClassName?: string;
+  readonly listStyle?: CSSProperties;
+  readonly listItemStyle?: CSSProperties;
+  readonly listIndent?: number;
+  readonly direction?: "ltr" | "rtl";
+}
+```
+
+`value` is `unknown` rather than `string` because it is read straight from a
+saved Document, which may have been written years ago. A value that is not a
+string draws nothing rather than throwing.
+
+`linkColor` is written inline on every link, on the canvas and in the email.
+Leave it out and each mail client picks its own link colour.
+
+`paragraphStyle` and `paragraphClassName` go on every `<p>` when the prop holds
+paragraphs, which it does with `constraints: { paragraphs: true }` in its
+Schema entry. The last `<p>` gets `marginBottom: 0`. A prop without the option
+ignores both. See [Paragraphs](/guides/rich-text/#paragraphs).
+
+`listStyle` goes on every `<ul>` and `<ol>`, and `listItemStyle` on every
+`<li>`, when the prop holds lists. It does with
+`constraints: { paragraphs: true, lists: true }`. A list that ends the text,
+and the last item of each list, get `marginBottom: 0`.
+
+`listIndent` is the indent in pixels, default 24, written on `margin-left`.
+With `direction: "rtl"` it goes on `margin-right` and the list gets
+`dir="rtl"`. See [Lists](/guides/rich-text/#lists).
+
+`sanitiseInlineMarkup(html, shape?)` cleans untrusted markup down to what email
+allows. Use it when importing content from elsewhere. `shape` is a `TextShape`,
+`{ paragraphs?: boolean; lists?: boolean }`.
+
+Pass `{ paragraphs: true }` for a prop that holds paragraphs, or they collapse
+into line breaks. Add `lists: true` for one that holds lists, or they become
+paragraphs.
+
+### Markup written by hand
+
+`sanitiseHtml(html, scope)` cleans markup your users wrote by hand, the way an
+`html` prop is cleaned before `render` sees it. `scope` is the class to scope
+`<style>` rules to. A value that is not a string comes back as `""`. Cleaning
+the result again changes nothing.
+
+`htmlScopeOf(blockId)` is the class the library scopes a Block's `html` prop
+to: `lekh-h-` and the Block's id, escaped for CSS.
+
+For what is kept and what is dropped, see
+[The html Block](/reference/blocks/#the-html-block).
+
+`markTextEdit(blockId, options?)` records that text changed. Its
+`TextEditOptions` is one flag:
+
+| Option     | Type      | Default | What it does                                     |
+| ---------- | --------- | ------- | ------------------------------------------------ |
+| `coalesce` | `boolean` | `false` | Fold into the entry already held for this Block. |
+
+That flag is typing coalescence. The Text Engine decides what a chunk of typing
+is, and passing `true` for a change it folded into its own last history entry
+keeps both stacks the same depth. Undo then removes a word rather than a
+letter.
+
+## Phones
+
+`MOBILE_MAX_WIDTH` is the breakpoint, and `MOBILE_CLASSES` the two class names
+the library ships rules for. `MobileStructure` is their union — `"stack"` and
+`"hide"`.
+
+Both are element-local. `stack` makes the element it sits on a full-width
+column; `hide` takes it off a small screen. Neither says anything about the
+markup around it, which is what lets any Definition ask for them whatever it
+renders. Anything that does depend on surrounding markup — reversing a row's
+column order needs the element those columns are children of — belongs to the
+Block that owns that markup, and goes through `add`.
+
+`MobileRules` is the collection every Block shares while an email renders:
+
+| Member               | What it does                                               |
+| -------------------- | ---------------------------------------------------------- |
+| `classOf(blockId)`   | The Overrides class for a Block, or `undefined`.           |
+| `use(...structures)` | Ask for structural classes, marking their rules as needed. |
+| `add(css)`           | Contribute bespoke rules, already inside the media query.  |
+| `stylesheet()`       | Every collected rule in one media query.                   |
+
+`MobileRenderContext` is what a Definition's `render` actually receives: all of
+that except `classOf`, plus two of its own. `className` is the class this
+Block's own Overrides were emitted under. `only(element)` wraps the Block so it
+shows on a phone and nowhere else.
+
+A Schema entry declares its mobile behaviour with a `MobileDeclarations`
+function, which turns the prop's value into CSS declarations:
+
+```ts
+type MobileDeclarations<TValue = unknown> = (
+  value: TValue,
+  rootProps: Readonly<Record<string, unknown>>,
+) => Readonly<Record<string, string>>;
+```
+
+`rootProps` are the root's resolved props, the same ones `render` gets. Most
+declarations ignore them. An alignment needs them, because `start` is the right
+side in a right-to-left email.
+
+Rules are collected only when something asks for them, so an email that never
+stacks emits no media query at all.
+
+See [Make emails work on phones](/guides/responsive/).
+
+## Helpers
+
+`assetOf(value)` narrows a stored prop to an `Asset`, or `undefined`.
+
+`isBlank(value)` says whether a value counts as empty. Used by the built-in
+checks.
+
+`clipCheck(html, { limit, headroom })` says how close an email's HTML is to
+Gmail's clip, as `{ bytes, limit, risk }`. `GMAIL_CLIP_BYTES` is the default
+limit. `ClipCheck` and `ClipCheckOptions` are its types. See
+[Render](/reference/render/#clipcheck).
+
+## Everything this entry point exports
+
+A test fails if any name this entry point exports stops appearing on this page,
+so this list is complete rather than representative.
+
+**Building an editor.** `createEditor`, `createDocument`, `defineBlock`,
+`Editor`, `EditorOptions`, `EditorConfigurationError`, `Preset` — which is only
+`readonly BlockDefinition[]`, so a Preset is an array and composing one is a
+spread.
+
+**The Document.** `EmailDocument`, `Block`, `BlockDefinition`, `BlockSchema`,
+`SchemaEntry`, `SchemaKind`, `BoxSide`, `MailClientNote`, `BlockRenderContext`,
+`Migration`.
+
+**Editing.** `Action`, `ActionVia`, `ControlDescriptor`, `Origin`, `PendingChange`, `AddableChild`, `EditableChild`, `Division`,
+`Share`, `TextEngine`, `TextEditOptions`, `PlacementIntent`, `PlaceOutcome`.
+
+**Suggestions.** `Suggestion`, `SuggestionEvent`, `SuggestionStatus`,
+`SuggestOptions`, `SuggestionRefusal`, `SuggestionTouch`, `AcceptOutcome`,
+`ExtendOutcome`, `FinishOutcome`,
+`SuggestionJSON`, `SuggestionBase`, `SuggestionBaseValue`, `EditRefusal`, `EditRefusalCode`.
+`describeBlocks`, `BlockDescription`, `JSONSchema`.
+
+**Commands.** `createCommands`, `Commands`, `CommandName`.
+
+**Ops.** `Op`, `InsertOp`, `RemoveOp`, `MoveOp`, `SetPropOp`, `TextEditOp`,
+`LOCAL_ORIGIN`, `Unsubscribe`.
+
+**Dropping.** `DropTarget`, `DropTargetQuery`, `DropTargetsQuery`,
+`DropOutcome`, `DropRefusal`,
+`DropRefusalCode`, `BlockRect`, `Point`, `LayoutAxis`.
+
+**Images.** `Asset`, `assetOf`, `ImageResolver`, `ImageRequest`,
+`ImageRequestFacts`, `ImageRequestReason`, `ImageRequestState`,
+`ImagePlacement`, `PendingImage`, `FailedImage`.
+
+**Checking and fixing.** `Diagnostic`, `Severity`, `SeverityOverrides`,
+`Validator`, `ValidationContext`, `ValidationSetup`, `Repair`, `KnownRepair`,
+`ConsumerRepair`, `RestoreRequiredBlockRepair`, `SetPropRepair`, `Edit`,
+`DiagnosticCode`.
+
+**Rich text.** `RichText`, `RichTextProps`,
+`sanitiseInlineMarkup`, `TextShape`.
+
+**Markup written by hand.** `sanitiseHtml`, `htmlScopeOf`.
+
+**Colour.** `Surface`, `NONE`, `brandColorsOf`, `BrandColor`.
+
+**Phones.** `Stage`, `MOBILE_MAX_WIDTH`, `MOBILE_CLASSES`, `MobileStyles`,
+`MobileStructure`, `MobileRules`, `MobileRenderContext`, `MobileDeclarations`,
+`classNames`, `isBlank`.
+
+**Size.** `clipCheck`, `ClipCheck`, `ClipCheckOptions`, `GMAIL_CLIP_BYTES`.
+
+The render path, the Validators and the agent tools come from `lekh` too. Each
+has its own page: [Render](/reference/render/),
+[Validators](/reference/validators/) and [Agent tools](/reference/agent/). A send
+job that imports only the render path bundles no editor.

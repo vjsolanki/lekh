@@ -1,0 +1,174 @@
+---
+title: Add unsubscribe and a postal address
+description: "Meet the legal requirements for commercial email."
+---
+
+## What you'll do
+
+Put a working opt-out link and a postal address in every marketing email, and
+make it hard for anybody to break either.
+
+## The short version
+
+Compose the compliance Preset alongside your Blocks.
+
+```ts
+import { createCompliancePreset } from "lekh/blocks";
+
+const definitions = [
+  ...createReactEmailPreset(),
+  ...createCompliancePreset({
+    unsubscribeUrl: "%%unsubscribe_link%%",
+    postalAddress: "Acme Inc, 1 Example Street, London N1 1AA",
+  }),
+];
+```
+
+That is it. Every new email starts with both Blocks, neither can be deleted by
+accident, and an email missing one cannot be sent.
+
+## What the law wants
+
+Most commercial email regimes ask for the same two things. CAN-SPAM in the US,
+GDPR and PECR in the UK and EU, and CASL in Canada all want:
+
+- **A working way to opt out**, easy to find and honoured promptly.
+- **A real postal address** for the sender.
+
+This is not legal advice, and the details differ by country. What the library
+gives you is the mechanism to carry both, and a refusal to send without them.
+
+Transactional email like receipts and password resets is generally exempt. That
+is why these ship as a separate Preset: an editor for those emails never
+composes it in.
+
+## The unsubscribe URL is not content
+
+`unsubscribeUrl` is configuration. It never enters a saved email.
+
+A real opt-out link is different for every recipient, so it does not exist
+while somebody is designing the email. You pass whatever token your email
+provider substitutes at send time, such as `%%unsubscribe_link%%` or
+`{{unsubscribe_url}}`, and the Block renders it.
+
+Because it is baked into the renderer rather than stored as a prop:
+
+- It never reaches the inspector, so nobody can edit it.
+- It never enters a Document, so **changing provider needs no migration of any
+  email you have already saved**.
+
+People can reword the link, restyle it and move it around the footer. They
+cannot break where it points.
+
+There is deliberately no default. A guess at somebody else's substitution
+syntax would ship a dead opt-out link, which is exactly what this exists to
+prevent.
+
+## The postal address is content
+
+The opposite case, and treated the opposite way.
+
+It is the same for every recipient, somebody can reasonably type it, and it has
+to be reformattable — how an address is laid out differs by country.
+
+So it is an ordinary editable prop. Your `postalAddress` option is only the
+starting value: an email somebody has edited keeps what they wrote, and one
+they have not follows the option.
+
+Change the option and every untouched email picks up the new address. Emails
+where somebody typed their own do not.
+
+## What happens when somebody deletes the footer
+
+The delete **succeeds**. Editing stays forgiving.
+
+The email becomes invalid and says so, through a Diagnostic carrying a
+one-click fix that puts the Block back. If nobody fixes it, `renderDocument`
+throws when you go to send.
+
+So an unfixed email cannot go out, and somebody mid-edit is never fought.
+
+Both Blocks are `required` and `deletable: false`, so a direct delete is
+refused. The realistic way to lose one is deleting the section around it, which
+is the case the Diagnostic covers.
+
+Render the problems, or nobody sees them:
+
+```ts
+editor.getDiagnostics(); // includes "required-block-missing"
+```
+
+See [Show problems and offer fixes](/guides/diagnostics/).
+
+## Empty values
+
+| Code                                         | Severity | Repair                      |
+| -------------------------------------------- | -------- | --------------------------- |
+| `ComplianceDiagnostic.unsubscribeLabelEmpty` | warning  | Puts the default text back. |
+| `ComplianceDiagnostic.postalAddressEmpty`    | warning  | None. Nothing knows it.     |
+
+Warnings, so somebody clearing a field to retype it is not fought mid-keystroke.
+
+Promote either to an error if your product needs to:
+
+```ts
+createEditor({
+  definitions,
+  severities: { "postal-address-empty": "error" },
+});
+```
+
+Severity only goes up. An error can never be softened. If you do not want a
+required Block, do not compose this Preset.
+
+## Making the footer yours
+
+The two Blocks are ordinary Block Definitions. Style them with the same
+`color`, `fontSize` and `align` props as everything else. They write the
+email's own font, so the footer matches the email above it.
+
+They already fit into the built-in Preset with no configuration. The root and
+the column accept both types, so they can be dragged into a footer like
+anything else.
+
+Want a completely different footer? Write your own Definitions with
+`required: true` and `deletable: false`, and skip this Preset. Nothing here is
+privileged — see [Build a compliance footer of your
+own](/guides/custom-compliance/).
+
+## Two more things worth doing
+
+Neither is the library's job, but both matter:
+
+**Honour opt-outs quickly.** The link only helps if the request is actioned.
+
+**Add a `List-Unsubscribe` header** at send time. Mail clients surface it as a
+one-click button, and it reduces spam reports. That is a header on the message,
+not part of the HTML.
+
+## Common problems
+
+**The unsubscribe link is dead in the sent email.** Your provider's token is
+different, or it does not substitute inside an `href`. Check what yours expects.
+
+**`createCompliancePreset` throws about the root.** Your root Definition's
+`accepts` does not include `unsubscribe` and `postal-address`. The built-in
+Preset already does; a custom root needs them added.
+
+**Sending throws about a missing Block.** Somebody deleted the footer and
+nobody fixed it. Working as intended.
+
+**The address is stale on old emails.** Somebody edited it there. Your option
+only sets the starting value.
+
+**People keep emptying the label.** Promote
+`ComplianceDiagnostic.unsubscribeLabelEmpty` to an error.
+
+## Why it works this way
+
+The split runs through everything here: the URL is configuration because no
+person can supply it, and the address is content because a person must. Getting
+that boundary right is what lets somebody restyle a footer freely without ever
+being able to ship an email nobody can opt out of.
+
+Read [Forgiving editor, strict render](/why/forgiving-editor/).

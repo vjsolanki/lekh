@@ -1,0 +1,150 @@
+---
+title: Compliance Blocks
+description: "The unsubscribe link and postal address that commercial email needs."
+---
+
+import { createCompliancePreset } from "lekh/blocks";
+import BlockReference from "../../../components/BlockReference.astro";
+
+Two Block Definitions that cover the legal minimum for marketing email: a
+working way to opt out, and a postal address.
+
+Both are **required** and **not deletable**. They ship as their own Preset, so
+an editor for transactional email like receipts and password resets never
+composes them in.
+
+They come from [`lekh/blocks`](/reference/blocks/), next to the other built-in
+Blocks.
+
+## Import
+
+```ts
+import { createCompliancePreset } from "lekh/blocks";
+
+const definitions = [
+  ...createReactEmailPreset(),
+  ...createCompliancePreset({
+    unsubscribeUrl: "%%unsubscribe_link%%",
+    postalAddress: "Acme Inc, 1 Example Street, London N1 1AA",
+  }),
+];
+```
+
+`@react-email/components` is an optional peer dependency. Install it if you
+import this.
+
+## createCompliancePreset
+
+```ts
+function createCompliancePreset(options: CompliancePresetOptions): Preset;
+```
+
+### Options
+
+| Option           | Type     | Default     | What it does                              |
+| ---------------- | -------- | ----------- | ----------------------------------------- |
+| `unsubscribeUrl` | `string` | —           | Required. Where the opt-out link points.  |
+| `postalAddress`  | `string` | `""`        | The address a new email starts with.      |
+| `fontFamily`     | `string` | A safe sans | Font stack for a root that names no font. |
+
+Under the built-in Preset's root, both Blocks write the email's own font. Your
+`fontFamily` is used only under a root that has none.
+
+## Why the URL is not editable
+
+`unsubscribeUrl` is configuration, not content.
+
+A real unsubscribe link is different for every recipient, so it does not exist
+while somebody is designing the email. You pass whatever your email provider
+substitutes, such as `%%unsubscribe_link%%` or `{{unsubscribe_url}}`, and the
+Block renders it.
+
+It is baked into the renderer, not stored as a prop. So it never appears in the
+inspector, never enters a saved email, and **changing provider needs no
+migration of anything you have already saved**.
+
+People can reword the link, restyle it and move it. They cannot break it.
+
+There is deliberately no default. A guess at somebody else's substitution
+syntax would ship a dead opt-out link, which is the one thing these Blocks
+exist to prevent.
+
+## The Blocks
+
+### unsubscribe
+
+`label` is the words in the link. `align` follows the email's direction like
+every other alignment. See [Alignment](/reference/blocks/#alignment).
+
+Emptying the label raises a Diagnostic with the code
+`unsubscribe-label-empty`, carrying a Repair that puts the default text back.
+
+### postal-address
+
+`address` is the address text. A new email starts with your `postalAddress`
+option.
+
+Leaving it blank raises `postal-address-empty`. That one carries no Repair,
+because nothing can know your address.
+
+## Every Block's props
+
+Read from `createCompliancePreset()` when this site is built, so they cannot
+drift from the code. A default that comes from an
+[option](#options) shows the option's own default, so `address` shows `""`.
+
+**Version** is what the Block writes today. Stamp it on every Block you write
+by hand. See [The Document](/reference/document/#version-stamp-it).
+
+<BlockReference
+  definitions={createCompliancePreset({ unsubscribeUrl: "%%unsubscribe%%" })}
+/>
+
+## Exported codes
+
+```ts
+UNSUBSCRIBE_TYPE; // "unsubscribe"
+POSTAL_ADDRESS_TYPE; // "postal-address"
+ComplianceDiagnostic.unsubscribeLabelEmpty; // "unsubscribe-label-empty"
+ComplianceDiagnostic.postalAddressEmpty; // "postal-address-empty"
+```
+
+Match on these instead of on the strings, and present the problem in your own
+words.
+
+## What happens if somebody deletes the footer
+
+The delete succeeds. Editing stays forgiving.
+
+The email becomes invalid and says so, through a Diagnostic carrying a
+one-click fix that puts the Block back. If it is still missing when you go to
+send, `renderDocument` throws.
+
+So an email that was never fixed cannot be sent, and somebody mid-edit is never
+blocked. See [Show problems and offer fixes](/guides/diagnostics/).
+
+## Making a warning an error
+
+Both empty-value findings are warnings by default. Promote them if your product
+needs to:
+
+```ts
+createEditor({
+  definitions,
+  severities: { "unsubscribe-label-empty": "error" },
+});
+```
+
+Errors block rendering. Warnings never do.
+
+Severity only goes up. An error cannot be softened to a warning. If you do not
+want a required Block, do not compose this Preset.
+
+## Everything on this page
+
+Five names, all exported from `lekh/blocks`:
+
+`createCompliancePreset`, `CompliancePresetOptions`, `UNSUBSCRIBE_TYPE`,
+`POSTAL_ADDRESS_TYPE`, `ComplianceDiagnostic`
+
+`defineBlock` and the rest come from [`lekh`](/reference/lekh/).

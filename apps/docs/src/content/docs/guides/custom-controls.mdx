@@ -1,0 +1,156 @@
+---
+title: Add your own control types
+description: "Teach the inspector to render a control the library has never heard of."
+---
+
+import { Code } from "@astrojs/starlight/components";
+import custom from "../../../examples/custom-control.tsx?raw";
+import Demo from "../../../components/Demo.astro";
+
+## What you'll do
+
+Invent a new kind of prop and edit it in the inspector: an icon picker, a
+spacing stepper, a product chooser wired to your own API.
+
+## The short version
+
+`kind` is an open string. Make one up, put whatever you need in `constraints`,
+and handle it in your inspector's switch.
+
+<Code code={custom} lang="tsx" title="custom-control.tsx" />
+
+There is no registration step. Nothing to tell the library.
+
+## Constraints are yours
+
+Anything you put in `constraints` reaches your control untouched. The library
+never reads it, never validates against it, and never fills anything in.
+
+```ts
+schema: {
+  product: {
+    kind: "product-picker",
+    label: "Product",
+    defaultValue: null,
+    constraints: { catalogue: "uk", allowOutOfStock: false },
+  },
+},
+```
+
+They arrive as `unknown`, because you put them there. Narrow before use, as the
+example's `readSteps` does.
+
+## Values can be any shape
+
+A prop is not limited to a string or a number. Anything JSON can hold works:
+
+```ts
+defaultValue: { id: null, name: "", price: 0 },
+```
+
+Two rules:
+
+**It must survive `JSON.stringify`.** No functions, no class instances, no
+`Date` objects. It is going into a saved email.
+
+**Narrow it when you read it.** A saved email may hold a shape written by an
+older version of your code.
+
+## Fetching data inside a control
+
+Perfectly fine. The control is your component.
+
+```tsx
+function ProductPicker({ control }: { control: ControlDescriptor }) {
+  const products = useProducts();
+  return <select onChange={(e) => control.set(findProduct(e.target.value))} />;
+}
+```
+
+Store the resolved value in the email, not an id you will have to look up
+again at send time. A send job should not need your product API to render an
+email.
+
+The exception is anything per-recipient. That belongs in your Block's renderer
+as a substitution token, the way the unsubscribe URL does. See
+[Add unsubscribe and a postal address](/guides/compliance/).
+
+## Long-running work
+
+`control.set` is synchronous and immediate. For anything slow, such as an
+upload or a remote lookup, do the work first and set the finished value once:
+
+```tsx
+const chosen = await openMyPicker();
+if (chosen) control.set(chosen);
+```
+
+Never call `set` with a temporary value and again with the real one. That is
+two undo steps for one thing somebody did.
+
+For images specifically, do not build this yourself. `resolveImage` already
+handles asking, progress, cancelling and retrying. See
+[Handle images and uploads](/guides/images/).
+
+## Validating a custom value
+
+Put the check on the Block, so it travels with it:
+
+```ts
+validate: (block) =>
+  block.props["product"] === null
+    ? [{ code: "product-not-chosen", message: "Pick a product.", severity: "warning" as const, blockId: block.id }]
+    : [],
+```
+
+Attach a repair if there is an obvious fix. Your own `kind` is fine.
+`applyRepair` returns `false` for it, which is your cue to handle it. See
+[Show problems and offer fixes](/guides/diagnostics/).
+
+## Naming kinds
+
+Match the built-in names where the meaning matches: `text`, `number`,
+`boolean`, `color`, `select`, `align`, `url`. One switch then covers your
+Blocks and the shipped Preset together.
+
+Invent a name only when the control genuinely differs. A `"color"` that opens
+your brand palette is still a `"color"`.
+
+## Phone-only values
+
+A custom kind can have one, like any other. Say how the value becomes CSS:
+
+```ts
+mobile: (height) => ({ height: `${height}px` }),
+```
+
+Without `mobile`, the prop never appears on the mobile Stage.
+
+## Try it
+
+The **Tone** control below uses `kind: "tone"`, which the library has never
+heard of. Nothing was registered to make it work. Read the descriptor dump and
+you will find it passed through untouched, `constraints` and all.
+
+<Demo name="controls" />
+
+## Common problems
+
+**The control never renders.** Your switch has no case for the kind, and the
+`default` returns `null`. Add a dev-mode warning to catch this.
+
+**Constraints are `undefined`.** They are optional in the Schema. Default them.
+
+**The value is right in the panel but wrong in the email.** Your `render` reads
+`block.props` directly instead of the resolved `props` it is given. Use the
+`props` argument, which has defaults filled in.
+
+**Two undo steps per change.** You called `set` twice. Set once, at the end.
+
+## Why it works this way
+
+If control kinds were a fixed list, every product with an unusual prop would be
+stuck waiting for a library release. An open string costs one `default` case
+and removes that ceiling entirely.
+
+Read [Headless by design](/why/headless/).

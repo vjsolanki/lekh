@@ -1,0 +1,253 @@
+---
+title: The Document
+description: "What a saved email holds: every field of a Block, and the shape of each value."
+---
+
+import { Code } from "@astrojs/starlight/components";
+import welcome from "../../../examples/document/welcome.json?raw";
+import unstamped from "../../../examples/document/unstamped-heading.json?raw";
+
+A Document is the JSON tree that holds an email. `editor.getDocument()` hands
+you one, and `createEditor({ document })` opens one. This page is its exact
+shape, for writing one by hand or mapping another template format into it.
+
+Each node in the tree is a Block: a section, a heading, a button. A Block
+Definition is the registered description of one type of Block: its props, how
+it renders, and what it may hold.
+
+Everything here holds whatever Blocks you register. The props of the built-in
+Blocks are on [lekh/blocks](/reference/blocks/#every-blocks-props) and
+[Compliance Blocks](/reference/compliance/#every-blocks-props).
+
+## A whole Document
+
+<Code code={welcome} lang="json" title="welcome.json" />
+
+This one uses the built-in Preset, a set of Block Definitions shipped together. It loads with nothing changed and nothing wrong, and it renders.
+
+## The Document
+
+```ts
+interface EmailDocument {
+  readonly root: Block;
+}
+```
+
+The root is an ordinary Block. Settings for the whole email, such as its
+background or its font, are the root's props. There is no separate theme.
+
+The root's `type` is the `rootType` you pass to `createEditor`. For the
+built-in Preset it is `"email"`.
+
+## A Block
+
+A Block is one node in the tree. Every Block has the same six fields, whatever
+its type.
+
+| Field      | Type      | When absent     | What it is                                                   |
+| ---------- | --------- | --------------- | ------------------------------------------------------------ |
+| `id`       | `string`  | —               | Required. Any string, unique in the Document.                |
+| `type`     | `string`  | —               | Required. The `type` of the Block Definition that draws it.  |
+| `props`    | `object`  | —               | Required. The values set on this Block. Write `{}` for none. |
+| `mobile`   | `object`  | none            | Values for phones only, keyed like `props`.                  |
+| `children` | `Block[]` | holds nothing   | The Blocks inside it, in order. Only on a container.         |
+| `version`  | `number`  | `0`, the oldest | The version of its Definition it was written at.             |
+
+A Block Definition's Schema is the list of props your users can edit, each
+with a default.
+
+**Ids are not checked for you.** Nothing makes them unique when a Document
+loads, so make them unique when you write them. The editor gives every Block it
+creates a fresh id.
+
+**`children` is for containers.** A Block whose Definition has no `accepts` is
+a leaf. Leave `children` off it.
+
+### `props` is sparse
+
+A prop that is missing resolves to its Schema default. So write only the props
+that differ from the default. The heading in the example sets its `content` and
+nothing else.
+
+Leaving a prop out is not the same as storing its default. If the default
+changes in a later release, a missing prop moves with it, and a stored one does
+not.
+
+A stored prop the Schema does not declare is kept, and nothing reads it.
+
+### `mobile` holds phone-only values
+
+A Mobile Override is a phone-only value: a value a prop takes on phones only. `mobile` holds them,
+keyed like `props`:
+
+```json
+"mobile": { "paddingLeft": 16, "paddingRight": 16 }
+```
+
+It is sparse too. A prop with no key here follows its value in `props`, so
+changing the desktop value still changes the phone. Leave `mobile` off a Block
+that has none, which is nearly all of them.
+
+**Only props that take a phone-only value count.** Their Schema entry says how
+the value becomes CSS on a phone. The Preset's tables show them as "yes".
+
+An override on any other prop is ignored. It stays stored, and it is never
+shown or written into the email.
+
+### `version`: stamp it
+
+Give every Block its Definition's current version. The Preset's tables show it
+for each Block. In code, it is `definition.version ?? 0`.
+
+A missing `version` means 0. Loading a Document runs every migration from the
+Block's version up to the current one. So a Block with no `version` gets every
+migration its Definition has ever had.
+
+Migrations are written for old shapes. Run on a Block that is already in
+today's shape, one can still change it. Take this heading:
+
+<Code code={unstamped} lang="json" title="unstamped-heading.json" />
+
+Version 1 of `heading` made headings follow the email's text colour. Headings
+stored before it, with no colour of their own, rendered in `#111111`. The
+migration keeps that look by storing it on them.
+
+So loading this heading stores `"color": "#111111"` on it. It no longer follows
+the email's `textColor`, which is not what you meant. Stamped with
+`"version": 3`, nothing runs, and it follows the email.
+
+The editor stamps every Block it creates. A Definition with no `version` writes
+none, which is the same as 0.
+
+## Values
+
+Each prop's Schema entry has a `kind`, an open string that says what its value
+is. These are the kinds the built-in Preset uses, and how each is stored.
+
+The plain ones are what they look like. `text` is a string, `number` a number,
+`boolean` a boolean. `select` is one of the values in its `constraints.options`.
+
+### `surface-color`
+
+A colour that can be no colour: a Block's background, a button's fill. It is a
+CSS colour string, or the string `"none"`.
+
+`"none"` means nothing is painted and what is behind shows through. The email
+writes no `background-color` at all for it. It is the default of most
+backgrounds, so a missing prop usually means `"none"` too.
+
+`"transparent"` works the same way in the email, since it is a real CSS colour.
+Prefer `"none"`, because it is what the editor stores when your users clear one.
+
+### `color`
+
+A CSS colour string that always has a value: text, a border, a divider's line.
+There is no `"none"`.
+
+Use a hex colour, such as `"#0b57d0"`, or `rgb()`. Those are the only colours
+the editor can read. The contrast check says nothing about one it cannot, such
+as `"navy"`.
+
+The email's `textColor` and `linkColor`, on the root, must also be opaque. A
+name, or a part-transparent `rgba()`, renders your default instead.
+
+Some colours follow the root. A heading with no `color` of its own takes the
+email's `textColor`, and the tables show its default as "the email's
+`textColor`".
+
+Store a `color` on it and it stops following. Leave it out to keep following.
+
+### `align`
+
+One of `"start"`, `"center"` or `"end"`. Start is the side the email reads
+from: the left in a left-to-right email, the right in a right-to-left one.
+
+Never store `"left"` or `"right"`. Any value that is not one of the three
+renders as the Block's default.
+
+When you map a left-to-right template, `left` is `"start"` and `right` is
+`"end"`. In a right-to-left one, it is the other way round.
+
+### `url`
+
+A string, written into the `href` as you stored it. Merge tags such as
+`{{url}}` or `*|ARCHIVE|*` work.
+
+An empty string means no link. The image, icon and nav link then draw with no
+link. The button raises a warning, because a button that goes nowhere is a
+mistake.
+
+### `asset`
+
+A picture, as an object:
+
+```ts
+interface Asset {
+  readonly src: string; // where the picture lives
+  readonly width: number; // its real width, in px
+  readonly height: number; // its real height, in px
+  readonly alt?: string; // what it says when pictures are blocked
+}
+```
+
+`width` and `height` are the picture's own size, not the size it shows at.
+Several mail clients draw a picture at its real size unless the markup says
+otherwise, so the email always writes both. Give real numbers above zero.
+
+A missing `asset` means no picture. An image Block without one renders nothing.
+
+### `rich-text`
+
+A string of inline HTML. The editor reads only a small set of tags, and writes
+the same set back:
+
+- `<strong>`, `<em>`, `<u>`, `<s>`, and `<a href>`. `<b>`, `<i>`, `<del>` and
+  the like are read as their partner.
+- `<br />` for a line break.
+- `<p>`, when the prop holds paragraphs. In the Preset that is `text`, not
+  `heading`.
+- `<ul>`, `<ol>` and `<li>`, when it also holds lists. In the Preset that is
+  `text`. One level deep.
+
+Any other inline tag is dropped and its words are kept. A block tag such as
+`<div>` or `<h2>` becomes a paragraph break, or a line break where the prop
+holds no paragraphs. `<script>`, `<style>`, `<template>` and `<title>` are
+dropped with everything inside them. A link whose `href` has a
+scheme other than `http`, `https`, `mailto` or `tel` loses its link. One with
+no scheme, such as a merge tag, keeps it.
+
+For a heading, store `"Welcome to <strong>Acme</strong>"`. For text, store
+`"<p>One.</p><p>Two.</p>"`. A value with no `<p>` reads as one paragraph.
+
+### `html`
+
+A string of markup your users wrote by hand. It is stored exactly as written,
+and cleaned each time it is drawn or sent. See
+[The html Block](/reference/blocks/#the-html-block) for what cleaning removes.
+
+### `width`
+
+A number: a column's share of its row, as a percent. The editor keeps the
+columns of one row adding up to 100 as your users change them. Write them that
+way too.
+
+## Types you haven't registered
+
+A Document may hold a Block whose `type` has no Definition. Perhaps it came
+from a newer version of your Blocks.
+
+**The editor keeps it.** Its id, props and children are saved back exactly as
+they came. Nothing can edit or select it.
+
+Migrations skip it, but still run on the Blocks inside it.
+
+The Canvas, the live preview your users edit in, draws a stand-in in its place,
+holding its children. Your chrome can mark it through the `unregisteredBlock`
+slot. See [Draw the chrome](/guides/chrome/).
+
+**The email does not render.** The editor raises a `block-unregistered` error,
+a Diagnostic you can show your users. `renderDocument` throws
+`UnknownBlockError`, even with `validate: false`.
+
+To render it again, register the type, or remove the Block. See
+[Change a block after emails exist](/guides/migrations/#renaming-a-whole-block-type).

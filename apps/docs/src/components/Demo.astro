@@ -1,0 +1,33 @@
+---
+/**
+ * A live demo on the page, and a line of text in the llms.txt files.
+ *
+ * `starlight-llms-txt` renders every page again to turn it into Markdown, and
+ * it has no React renderer, so a React island there fails the whole build. It
+ * renders with the request for `/llms-full.txt` and the like, so a page asked
+ * for as text skips the island. The islands are imported here and picked by
+ * name, not passed as children: MDX renders children before this decides.
+ */
+import ControlsIsland from "./ControlsIsland.tsx";
+import DropRules from "./DropRules.tsx";
+import LivePreview from "./LivePreview.tsx";
+
+interface Props {
+  name: "controls" | "drop-rules" | "live-preview";
+}
+
+const { name } = Astro.props;
+const asText = Astro.url.pathname.endsWith(".txt");
+---
+
+{
+  asText ? (
+    <p>(An interactive demo is here on the web page.)</p>
+  ) : name === "controls" ? (
+    <ControlsIsland client:load />
+  ) : name === "drop-rules" ? (
+    <DropRules client:load />
+  ) : (
+    <LivePreview client:load />
+  )
+}

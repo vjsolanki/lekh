@@ -1,0 +1,283 @@
+---
+title: Let people type formatted text
+description: "Wire up the text engine and a formatting toolbar."
+---
+
+import { Code } from "@astrojs/starlight/components";
+import toolbar from "../../../examples/text-toolbar.tsx?raw";
+import paragraphs from "../../../examples/rich-text-paragraphs.tsx?raw";
+import lists from "../../../examples/rich-text-lists.tsx?raw";
+
+## What you'll do
+
+Let somebody double-click a Block on the canvas and type bold, italic and
+links, with the result surviving Outlook.
+
+## The short version
+
+Two steps: declare a rich-text prop on the Block, and wire the engine in two
+places.
+
+```tsx
+schema: {
+  content: { kind: "rich-text", label: "Content", defaultValue: "" },
+},
+render: ({ props }) => <p><RichText value={props.content} /></p>,
+```
+
+```tsx
+const text = createTiptapTextEngine();
+const editor = createEditor({ definitions, rootType, textEngine: text });
+
+<EditorProvider editor={editor} editableText={text.EditableText}>
+  <Canvas slots={{ textToolbar: TextToolbar }} />
+</EditorProvider>;
+```
+
+Install `@tiptap/core`, `@tiptap/pm` and `@tiptap/starter-kit`. All three are
+optional peer dependencies.
+
+## Why it goes in twice
+
+The engine has two halves, and two different things drive them.
+
+**History** is driven by the editor, so it goes to `createEditor` as
+`textEngine`.
+
+**The editable text** is mounted by the canvas, so it goes to
+`EditorProvider` as `editableText`.
+
+Wire only the first and text draws but cannot be typed into. That is the usual
+cause of "why is nothing editable?".
+
+## One Definition, both sides
+
+`<RichText>` becomes editable text on the canvas, and email-safe inline
+markup with the styles inlined on the render path.
+
+You write the Definition once, and it never knows which side it is on.
+
+A Block has at most **one** rich-text prop. The engine is scoped to a Block, so
+a second one would have nowhere to keep its history.
+
+## Getting in and out of the text
+
+A single click selects the Block. A **double-click** puts the caret in it, on
+the word that was clicked.
+
+Escape gets back out, and the Block stays selected. So does clicking another
+Block.
+
+While someone is typing, that Block cannot be dragged. Both are the same
+gesture of press, move, release, so a Block offers one or the other and never
+both. Every other Block on the canvas is still draggable.
+
+`editor.getEditing()` is the Block being typed into, or `undefined`. Read it
+when your own chrome should stand aside, such as a drag handle. It changes on
+the same subscription as everything else.
+
+`editor.edit(blockId)` does the same thing from your own button or tree row,
+and `editor.edit(undefined)` leaves.
+
+## Paragraphs
+
+By default a Block's text is one run of words. Return breaks the line. That
+suits a heading.
+
+For body copy, opt the prop in to paragraphs with
+`constraints: { paragraphs: true }`, and pass `paragraphStyle` to `RichText`:
+
+<Code code={paragraphs} lang="tsx" title="rich-text-paragraphs.tsx" />
+
+With paragraphs on:
+
+- **Return** starts a new paragraph. **Shift+Return** breaks the line inside
+  one.
+- The prop stores `<p>…</p><p>…</p>`, with `<br />` where a line was broken.
+- A paste keeps its paragraphs. Every block tag counts: `p`, `div`, `li`,
+  `h1`–`h6`, `blockquote` and the rest. Lists become plain paragraphs, unless
+  the prop also holds [lists](#lists).
+- Empty paragraphs are dropped. Space between paragraphs comes from
+  `paragraphStyle`, not from blank lines.
+- A value saved before you opted in still works. Text with no `<p>` in it reads
+  as one paragraph.
+
+`RichText` writes one `<p>` per paragraph, with `paragraphStyle` and
+`paragraphClassName` on each. The last one's `marginBottom` is set to `0`, so
+put the gap in `marginBottom`. Render the text inside a cell, not a `<p>`, since
+a `<p>` cannot hold another.
+
+The canvas draws the paragraphs in the same style, so the spacing your users see
+while typing is the email's.
+
+Without the option nothing changes. Return breaks the line, and a pasted
+`<p>a</p><p>b</p>` becomes `a<br />b`.
+
+## Lists
+
+Body copy often has steps or features in it. Let the prop hold bullet and
+numbered lists by adding `lists: true` next to `paragraphs: true`:
+
+<Code code={lists} lang="tsx" title="rich-text-lists.tsx" />
+
+`lists` needs `paragraphs`. `defineBlock` throws if you set one without the
+other.
+
+With lists on:
+
+- **`- `** or **`* `** at the start of a paragraph starts a bullet list.
+  **`1. `** starts a numbered one.
+- **Return** makes a new item. Return in an empty item leaves the list.
+  **Shift+Return** breaks the line inside an item.
+- **Backspace** at the start of the first item turns it back into a paragraph.
+- Lists are one level deep. Tab does not indent, and a pasted nested list
+  flattens into its parent, in reading order.
+- The prop stores `<ul>` or `<ol>` between the `<p>`s, with no attributes. Each
+  `<li>` holds text and `<br />`, like a paragraph.
+- A paste keeps its lists. A stray `<li>` becomes a bullet item. Start numbers,
+  marker types and empty items are dropped.
+
+`RichText` writes each list with `listStyle` and each item with
+`listItemStyle`. A list counts as one paragraph, so give it the paragraph gap as
+`marginBottom`. The last item of each list, and a list that ends the text, get
+`marginBottom: 0`.
+
+`RichText` adds what mail clients need on its own:
+
+- The indent is `listIndent` pixels (default 24) on `margin-left`, and the
+  padding is `0`. Logical properties like `margin-inline-start` fail in Gmail
+  and Outlook.
+- With `direction="rtl"` the list gets `dir="rtl"` and the indent moves to
+  `margin-right`.
+- Bullets are `disc` and numbers are `decimal`. Each bullet item gets
+  `mso-special-format: bullet`, or classic Outlook turns the items into
+  paragraphs.
+
+The canvas draws lists in the same style, so the indent and spacing your users
+see while typing are the email's.
+
+Some cases have no published client test yet: numbered list indent and right to
+left lists in classic Outlook. Gmail on the web also adds its own indent on top
+of the margin. Check these in a real client before you rely on them.
+
+## The formatting toolbar
+
+An ordinary slot. The library draws none of it.
+
+<Code code={toolbar} lang="tsx" title="text-toolbar.tsx" />
+
+`rect` is already translated into the canvas's coordinate space, so there is no
+arithmetic. The slot layer ignores pointer events, so set
+`pointerEvents: "auto"` or your buttons will not be clickable.
+
+`formatting` gives you accurate pressed states instead of guesses:
+`bold`, `italic`, `underline`, `strike`, `link`, and `list`, which is
+`"bullet"`, `"numbered"` or `undefined`.
+
+`commands` changes the selection: `toggleBold`, `toggleItalic`,
+`toggleUnderline`, `toggleStrike`, `setLink(href)`, `toggleBulletList` and
+`toggleNumberedList`. Pass `undefined` to `setLink` to unlink.
+
+The list toggles act on whole paragraphs, so they work with only a caret. In a
+prop that holds lists, the toolbar slot appears for a caret too, not only for a
+selected range. In any other prop the list toggles do nothing.
+
+Every command leaves focus where it was, so a toolbar button never ends the
+selection it acts on.
+
+## Undo is one timeline
+
+Type, drag a Block, press ⌘Z, and you get the **drag** back, not the last
+character.
+
+Text edits go onto the same history as everything else. ⌘Z works with nothing
+focused, and an edit whose engine history has gone is stepped over instead of
+spending somebody's keystroke on nothing.
+
+You get this by wiring both halves. There is nothing else to do.
+
+## Tuning how much one undo takes back
+
+```ts
+createTiptapTextEngine({ newGroupDelay: 500, depth: 100 });
+```
+
+`newGroupDelay` is the pause in milliseconds that ends a chunk of typing.
+Longer means one ⌘Z takes back more. `depth` is how many steps each Block
+keeps.
+
+## What survives in email
+
+Inline formatting only, with styles inlined: bold, italic, underline,
+strikethrough and links.
+
+Paragraphs and one-level lists too, in a prop that opts in to them. Other
+block-level structure like headings and quotes belongs to your Block
+Definitions, not to the text inside one. That is what keeps the markup
+table-based and predictable.
+
+Importing content from elsewhere? Clean it first. Pass the same options the
+prop declares, so the paragraphs and lists survive:
+
+```ts
+import { sanitiseInlineMarkup } from "lekh";
+
+const safe = sanitiseInlineMarkup(untrustedHtml);
+const body = sanitiseInlineMarkup(untrustedHtml, {
+  paragraphs: true,
+  lists: true,
+});
+```
+
+## Using a different editor
+
+Implement `TextEngine` and `EditableText` and pass yours instead. Nothing in the
+core knows Tiptap exists, so this is a supported path, not a fork.
+
+That is also why Tiptap is an optional peer dependency: supply your own and you
+never install it.
+
+## Common problems
+
+**Text draws but cannot be typed into.** You passed `textEngine` but not
+`editableText`.
+
+**One click does nothing.** That is the design. Double-click to get the caret;
+one click selects the Block so it can be dragged.
+
+**A Block cannot be dragged.** Somebody is typing in it. Press Escape, or click
+elsewhere.
+
+**The toolbar is not clickable.** Missing `pointerEvents: "auto"`.
+
+**The toolbar is in the wrong place.** You are adding scroll offsets. `rect` is
+already translated, so use it as it comes.
+
+**⌘Z takes back a whole paragraph.** Raise `newGroupDelay`.
+
+**Return breaks the line instead of starting a paragraph.** The prop has no
+`constraints: { paragraphs: true }`.
+
+**Typing `- ` does not start a list.** The prop has no `lists: true`, or the
+dash is not at the start of a paragraph.
+
+**`defineBlock` throws about lists.** You set `lists: true` without
+`paragraphs: true`. A list needs both.
+
+**The last paragraph still has space below it.** You set the gap in a `margin`
+shorthand. Use `marginBottom`, which `RichText` sets to `0` on the last one.
+
+**Formatting vanishes on send.** You used something email cannot inline.
+Inline styles only.
+
+**Two Blocks share one engine's history.** You reused one engine across two
+editors. Create one per editor.
+
+## Why it works this way
+
+Rich text needs a real editor, and every product has an opinion about which
+one. Defining the interface and shipping one implementation behind its own
+import means you can take ours, or bring yours, without either choice costing
+the other anything.
+
+Read [Headless by design](/why/headless/).

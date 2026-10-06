@@ -1,0 +1,225 @@
+---
+title: Add an agent to your editor
+description: "Hand any model ready tools, and show its changes as Suggestions your users accept or reject."
+---
+
+import { Code } from "@astrojs/starlight/components";
+import withClaude from "../../../examples/agent-with-claude.ts?raw";
+import anySdk from "../../../examples/agent-tools.ts?raw";
+import slot from "../../../examples/suggestion-slot.tsx?raw";
+import stream from "../../../examples/stream-a-suggestion.ts?raw";
+import ownButtons from "../../../examples/suggest-a-change.ts?raw";
+import imageTool from "../../../examples/agent-image-tool.ts?raw";
+
+## What you'll do
+
+Let your agent read the email and suggest changes, and let your users accept
+or reject each one.
+
+## The short version
+
+Hand the agent tools from `lekh` to your model, and run each tool call it
+makes through `call`. This uses Claude through the Anthropic SDK:
+
+<Code code={withClaude} lang="ts" title="agent-with-claude.ts" />
+
+Then draw what your agent suggested, with the Canvas's `suggestion` Slot. The
+Canvas is the editing surface. A Slot is a component you give it, and it hands
+you the rectangles to draw in:
+
+<Code code={slot} lang="tsx" title="suggestion-slot.tsx" />
+
+That is the whole loop. Your agent never writes to the email. Each change
+arrives as a Suggestion: shown on the Canvas, not stored, until your users
+accept it.
+
+Accepting is one undo step. Rejecting leaves nothing behind.
+
+lekh calls no model. You pick the model, hold the keys and pay for the tokens.
+
+### Any model SDK works
+
+Each tool is a name, a description and a JSON Schema input. Every model SDK and
+MCP server takes that shape. Only the field names differ: Anthropic calls the
+schema `input_schema`, others call it `parameters` or `inputSchema`.
+
+<Code code={anySdk} lang="ts" title="agent-tools.ts" />
+
+## Options
+
+`agentTools(editor, options)` takes these. A Block is one piece of the email,
+such as a heading or a button. The [Agent tools reference](/reference/agent/)
+has the full list.
+
+| Option       | Type      | Default | What it does                                           |
+| ------------ | --------- | ------- | ------------------------------------------------------ |
+| `focus`      | `string`  | none    | The id of the Block your users are asking about.       |
+| `autoAccept` | `boolean` | `false` | Accept each Suggestion at once. For jobs nobody sees.  |
+| `meta`       | `unknown` | none    | Stored on each Suggestion, to tie it to your own chat. |
+
+`focus` is a hint, not a fence. `read_email` gives that Block first, so your
+agent reads it before anything else.
+
+Your agent can still change the Block's neighbours, such as adding a P.S. under
+it. Your users see every Block a Suggestion touches before they accept.
+
+`editor.suggest(edits, options)` takes these, when you make a Suggestion
+yourself:
+
+| Option      | Type      | Default | What it does                                          |
+| ----------- | --------- | ------- | ----------------------------------------------------- |
+| `note`      | `string`  | none    | A sentence for your users on what it changes and why. |
+| `meta`      | `unknown` | none    | Your own data. Stored and handed back, never read.    |
+| `streaming` | `boolean` | `false` | It is still arriving. Grow it with `extend`.          |
+
+## In depth
+
+### What your agent can do
+
+The four tools are `read_email`, `describe_blocks`, `suggest` and
+`render_preview`. `suggest` takes a list of Edits. An Edit is one change:
+set a prop, insert a Block, remove one or move one.
+
+An Edit names Blocks by id, never by position. It places a new Block `after`
+or `before` a sibling, or inside a `parent`.
+
+A model counts positions wrong. A position also means something else once your
+users have moved things. An id does not.
+
+The tool descriptions carry the rules a model gets wrong without them. Your
+system prompt does not need to repeat them.
+
+### When the editor refuses
+
+The editor checks every Edit before anything shows. If one cannot apply, the
+whole Suggestion is refused, with a reason for each bad Edit. Your agent gets
+the reasons back as the tool's result, and can fix them and try again.
+
+It refuses a Block id that does not exist, a prop the Block does not have, a
+value of the wrong shape, and a Block in a place that will not take it. It also
+refuses any prop you closed to agents.
+
+It refuses a bare URL where an image goes. An image must be an Asset: an image
+your own tool already resolved, with its `src`, `width` and `height`.
+
+A Suggestion that applies but leaves a problem, such as an empty button label,
+is not refused. It comes back with its Diagnostics: the problems the email
+would have once it is accepted. Show them, and let your users decide.
+
+### Several open at once
+
+A Suggestion waits. Your users can click around and edit other Blocks, and it
+stays open. Your agent can make several, and all of them show at once.
+
+A Suggestion goes stale when anyone sets a prop it sets, or removes or moves a
+Block it touches. Accepting another Suggestion counts. A change to a different
+prop on the same Block leaves it open.
+
+A stale one stays in the list, so your users can still see what it said. It
+refuses to be accepted. Read `suggestion.status` to tell `streaming`, `open`
+and `stale` apart.
+
+### Stream a first draft
+
+A draft can arrive while your agent writes it. Start a streaming Suggestion
+with no Edits, grow it with `extend`, and `finish` it when your agent is done.
+Your users see it grow, and can accept it only once it is finished.
+
+<Code code={stream} lang="ts" title="stream-a-suggestion.ts" />
+
+### Your own buttons, your own thread
+
+`accept` and `reject` are methods on the Suggestion, so your chat panel, your
+Slot and your keyboard shortcuts all call the same thing. Put your thread's id
+in `meta` to find your way back from a Suggestion to the message that made it.
+
+<Code code={ownButtons} lang="ts" title="suggest-a-change.ts" />
+
+`editor.subscribeToSuggestions` tells you when one is made, grows, goes stale,
+or is accepted or rejected. The accept event carries the Ops it wrote. An Op
+is one stored change.
+
+Accepted Ops carry your editor's own origin, as your users' edits do. So your
+sync code sends them to other people unchanged. The accept event is the one
+place that says an agent made them, so log it there for an audit trail.
+
+### Let your agent add pictures
+
+An image prop takes an Asset, never a bare URL. An Asset is an image you
+already host: its `src`, `width` and `height`. A model cannot know those, so
+give it a tool of your own that searches your image library.
+
+Put your tool beside lekh's, and send its calls to your own code:
+
+<Code code={imageTool} lang="ts" title="agent-image-tool.ts" />
+
+Your agent calls `find_image`, then passes an Asset it got back to `suggest`.
+With the shipped image Block, that is an insert Edit like this:
+
+```ts
+{ kind: "insert", type: "image", after: "heading-1", props: { asset } }
+```
+
+The picture shows on the Canvas as part of the Suggestion, like any other
+change. `call` is now async, because your search is, so `await` it.
+
+The check on `suggest` is yours. It refuses a picture hosted anywhere but your
+library, so a model that pastes in an outside image is told to search instead.
+
+### Rewording text
+
+An Edit can set a rich-text prop, as HTML in the tags that prop allows. On
+accept, the editor hands the new text to the Text Engine, the part that owns
+typing.
+
+One undo takes the reword back. The next undo reaches what your users typed in
+that Block before.
+
+### What never changes
+
+`getDocument()` and the Op stream never hold an open Suggestion. Saving,
+rendering and syncing work as they did.
+
+To keep Suggestions across a reload, save `suggestion.toJSON()`. Restore each
+one with `editor.suggest(json.edits, json)`. One that no longer fits comes
+back stale.
+
+### The example
+
+[The example editor](/editor/) puts all of this together. Its agent plugs in
+as an optional part: a chat tab beside the Inspector, an Ask button on any
+Block, Suggestions drawn on the Canvas, and a streamed first draft.
+
+Its agent is scripted, so it needs no key. It still reads and suggests through
+these same tools. [How it is assembled](/example/agent/) walks through the
+code.
+
+To reach your emails from Claude Code or Codex instead, see
+[Let Claude Code and Codex edit your emails](/guides/agent-over-mcp/). To
+show the Canvas inside Claude or ChatGPT, see
+[Show your editor inside Claude and ChatGPT](/guides/agent-as-mcp-app/).
+
+## Common problems
+
+**Your agent's change does not show.** Check what `suggest` gave back. A
+refused Suggestion shows nothing. Send the reasons back to your agent.
+
+**A reworded Block still shows its old words.** Text already on the Canvas
+changes on accept, not before. Show the new words in your Slot or your chat,
+as a before and after. A Block the Suggestion inserts shows its text at once.
+
+**Accept does nothing.** It returns why. `streaming` means you have not called
+`finish` yet. `stale` means the email changed under it: ask your agent again.
+
+**Your agent sets an image to a URL and is refused.** That is on purpose. Give
+it a tool of your own that searches your image library and returns an Asset,
+as in [Let your agent add pictures](#let-your-agent-add-pictures).
+
+**A prop your agent should never touch.** Close it in the Block's Schema, the
+list of props its Block type declares, with `agent: false`. `describe_blocks` leaves it out, and `suggest` refuses it.
+
+## Why it works this way
+
+Every agent change goes through the same step your users can see and say no
+to, whichever model made it. The [Agent tools reference](/reference/agent/)
+lists every tool and type.

@@ -1,0 +1,133 @@
+---
+title: Let Claude Code and Codex edit your emails
+description: "Run a small MCP server on the agent tools from lekh, so your users can build and change emails from their terminal."
+---
+
+import { Code } from "@astrojs/starlight/components";
+import server from "../../../examples/mcp-server.ts?raw";
+
+## What you'll do
+
+Run an MCP server that lets Claude Code and Codex read and change the emails
+in your product.
+
+## The short version
+
+MCP is the protocol Claude Code, Codex and other agents use to call outside
+tools. This server hands them the four agent tools from `lekh`, plus two of
+your own to find an email. It uses the official MCP SDK,
+`@modelcontextprotocol/sdk`:
+
+<Code code={server} lang="ts" title="mcp-server.ts" />
+
+Fill in the four functions at the bottom: sign-in, and list, load and save from
+your own storage. Then add the server to Claude Code:
+
+```sh
+claude mcp add your-emails --env YOUR_APP_TOKEN=their-token -- node /path/to/mcp-server.ts
+```
+
+Codex takes the same command: `codex mcp add`, with the same arguments.
+
+Now your users can ask "open the spring sale email and add a P.S. under the
+button". Their agent finds the email, reads it and suggests the change. A
+Suggestion is a change your agent proposes, made of Edits: set a prop, insert,
+remove or move a Block. A Block is one piece of the email, such as a button.
+
+The server checks the Suggestion, saves it, and gives back a link to your
+editor.
+
+## Options
+
+The server passes these to `agentTools`:
+
+| Option       | Type      | Default | What it does                                            |
+| ------------ | --------- | ------- | ------------------------------------------------------- |
+| `autoAccept` | `boolean` | `false` | Accept each Suggestion at once. The server sets `true`. |
+
+The [Agent tools reference](/reference/agent/) has the full list.
+
+## In depth
+
+### What is yours to write
+
+Three things are yours, and the example marks each one.
+
+- **Auth.** Claude Code starts the server with the token the person gave it,
+  in `YOUR_APP_TOKEN`. `signIn` checks it and says who they are. Every load and
+  save runs as them, so they reach only their own emails.
+- **Storage.** `listEmails`, `loadEmail` and `saveEmail` talk to your database
+  or your API. The email is a Document: the JSON tree that holds it, the same
+  one your editor saves.
+- **The editor's address.** `EDITOR_URL` is where your users open an email in
+  the browser.
+
+Nothing else changes. The Block types are the ones your editor uses, so swap
+`createReactEmailPreset()` for your own list if you have one.
+
+### Why every Suggestion is accepted
+
+A Suggestion is a change shown on the Canvas, the editing surface, until your
+users accept it. A terminal has no Canvas. So the server accepts each
+Suggestion as soon as it is made, with `autoAccept`.
+
+It still goes through every check. The editor refuses an Edit it cannot carry
+out, such as a Block id that does not exist or a bare image URL. A refused
+Suggestion stores nothing, and your users' agent gets the reasons back to fix.
+
+A Suggestion that applies with problems, such as an empty button label, is
+saved. Its Diagnostics come back with it: the problems the email now has. Your
+users' agent can fix them, or your users can in the editor.
+
+### One editor per call
+
+Each call loads the email fresh, makes an editor for it, and saves it if
+anything changed. Edits made in the browser since the last call are kept.
+
+An Op is one stored change. The server watches for them with `onOp`, so a call that
+only reads never saves.
+
+### What the preview shows
+
+`render_preview` gives the email as HTML and as plain text. A terminal cannot
+draw HTML, so the server sends the plain text first, then a link to your
+editor. The HTML comes last, as an embedded resource, for clients that can show
+it.
+
+Your users read the text to check the words, then open the link to see the
+email and finish it by hand.
+
+Chats that can draw a page, such as Claude and ChatGPT, can show the Canvas
+itself. See
+[Show your editor inside Claude and ChatGPT](/guides/agent-as-mcp-app/).
+
+### Running it over HTTP
+
+The example talks over stdio: Claude Code starts it on your users' machine. To
+host one server for everyone, use the SDK's Streamable HTTP transport instead.
+Then auth moves to each request: read who is calling from its bearer token, not
+from the environment.
+
+## Common problems
+
+**The agent says no email is open.** It must call `open_email` first. Mention
+the email in the ask, or tell it to call `list_emails`.
+
+**A change the agent made overwrote someone's edit in the browser.** The server
+saves the whole Document. If your editor syncs through Ops, save the Ops from
+`onOp` through your sync code instead, as in
+[Save and load a document](/guides/save-and-load/).
+
+**The server will not start.** Check the path in `claude mcp add` is absolute,
+and that your Node version runs TypeScript. Node 24 does. Otherwise build it to
+JavaScript first.
+
+**Your agent sets an image to a URL and is refused.** Add an image tool of your
+own beside `list_emails`, as in
+[Let your agent add pictures](/guides/add-an-agent/#let-your-agent-add-pictures).
+
+## Why it works this way
+
+An agent in a terminal goes through the same checks as one beside your Canvas.
+lekh ships the tools, not the server, so your auth and storage stay yours. The
+[Agent tools reference](/reference/agent/) lists every tool.

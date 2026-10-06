@@ -1,0 +1,132 @@
+name: Size
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  size:
+    name: Bundle size
+    runs-on: ubuntu-latest
+    permissions:
+      # Commenting the change on a pull request. Nothing here pushes.
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # The measurement bundles dist/, so the build has to have happened.
+      - run: pnpm --filter lekh build
+
+      # The baseline is the base commit, built and measured here: the pull
+      # request's base, or the previous tip of main on a push. Nothing is
+      # stored between runs. A first push has no previous tip, so every entry
+      # point reads as new.
+      - name: Measure the base commit
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+        run: |
+          echo '{}' > "$RUNNER_TEMP/baseline.json"
+          if [ -z "${BASE_SHA//0/}" ] \
+            || ! git fetch -q --depth 1 origin "$BASE_SHA" 2>/dev/null; then
+            echo "No base commit to measure. Every entry point will read as new."
+            exit 0
+          fi
+          git worktree add -q "$RUNNER_TEMP/base" FETCH_HEAD
+          cd "$RUNNER_TEMP/base"
+          pnpm install --frozen-lockfile
+          pnpm --filter lekh build
+          pnpm --silent --filter lekh size \
+            --report "$RUNNER_TEMP/baseline.json" > /dev/null \
+            || echo '{}' > "$RUNNER_TEMP/baseline.json"
+
+      - name: Measure
+        run: |
+          {
+            echo '## Bundle size'
+            echo
+            pnpm --silent --filter lekh size --markdown \
+              --baseline "$RUNNER_TEMP/baseline.json"
+            echo
+            echo 'Gzipped, peer dependencies excluded. Change is against the base commit.'
+          } > size-comment.md
+          cat size-comment.md >> "$GITHUB_STEP_SUMMARY"
+
+      # Forks get a read-only token, so the comment would fail. The budget
+      # check below still runs, which is the part that guards the branch.
+      - name: Comment on the pull request
+        if: >
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const fs = require("node:fs");
+            const marker = "<!-- bundle-size-report -->";
+            const body = `${marker}\n${fs.readFileSync("size-comment.md", "utf8")}`;
+            const scope = {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            };
+            const comments = await github.paginate(
+              github.rest.issues.listComments,
+              scope,
+            );
+            // Rewrite the same comment on every push, so a long pull request
+            // does not collect one of these per commit.
+            const mine = comments.find((comment) =>
+              comment.body?.startsWith(marker),
+            );
+            if (mine) {
+              await github.rest.issues.updateComment({
+                ...scope,
+                comment_id: mine.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({ ...scope, body });
+            }
+
+      # The badges go to a public Gist, not to this repository: shields.io
+      # fetches them anonymously and cannot read a private repo. The Gist id is
+      # not a secret — it is in the badge URLs in README.md and the docs — but
+      # writing to it needs a token with the `gist` scope, which GITHUB_TOKEN
+      # does not carry. Until that secret exists, or while it is rejected, the
+      # step says so and passes, rather than failing main over a badge.
+      - name: Publish the badges
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ secrets.GIST_TOKEN }}
+          GIST_ID: 5d00f9ab6617974fe2b6a95b643ce5b7
+        run: |
+          if [ -z "${GH_TOKEN}" ]; then
+            echo "GIST_TOKEN is not set, so the badges were not updated." \
+              >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          pnpm --silent --filter lekh size \
+            --gist-payload "$RUNNER_TEMP/gist.json" > /dev/null
+          if ! gh api --method PATCH "gists/${GIST_ID}" \
+            --input "$RUNNER_TEMP/gist.json" --silent; then
+            echo "::warning::The Gist rejected GIST_TOKEN, so the badges were not updated."
+            echo "The Gist rejected GIST_TOKEN, so the badges were not updated." \
+              >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      # Last, so the badges and the comment exist even when this fails.
+      - name: Check the budgets
+        run: pnpm --silent --filter lekh size --check

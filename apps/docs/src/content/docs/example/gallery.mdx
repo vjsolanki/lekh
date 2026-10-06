@@ -1,0 +1,106 @@
+---
+title: "The example: the image gallery"
+description: "One function, answered in full. Progress, cancellation, failure, and why nothing enters the Document early."
+---
+
+`src/components/editor/gallery.tsx`, existing to answer one hook.
+
+## What the library gave it
+
+One function signature:
+
+```ts
+type ImageResolver = (request: ImageRequest) => Promise<Asset | undefined>;
+```
+
+That is the entire contract. Return an Asset to place the picture, `undefined`
+to say somebody cancelled, or reject to fail — which offers them a retry.
+
+The request carries `reason`, `files`, `placement`, `signal` and `onProgress`.
+
+## One hook, four routes
+
+An image arrives four ways, and they are one function rather than four hooks.
+Changing a picture has two reasons, one for an empty prop and one for a full
+one:
+
+| `reason`    | What happened                                     |
+| ----------- | ------------------------------------------------- |
+| `"insert"`  | An image Block was dropped from the palette.      |
+| `"add"`     | An empty image prop is getting its first picture. |
+| `"replace"` | A picture already placed is being changed.        |
+| `"drop"`    | Files were dragged onto the canvas.               |
+| `"paste"`   | A screenshot came from the clipboard.             |
+
+One entry point means one place to make policy. The example opens its gallery
+for every reason and pre-selects a dropped file; a product with a digital asset
+manager might upload straight away for `"drop"` and open a browser for
+`"insert"`.
+
+A click on a picture selects it and shows it larger. **Use image** answers
+the request, and a double-click answers at once. Until then nothing is
+decided, so Cancel or Esc still resolves with `undefined`.
+
+Alt text is asked after the pick, beside the preview. Tick **It's
+decorative** to leave it empty.
+
+The gallery asks no alt text at all for a background. The placement has
+`decorative: true`, read from the prop's Schema entry, and the gallery hides
+the alt field.
+
+Instead, a background gets a small preview. The picture sits behind a line of
+text, filling the box for a section or tiling for the page. Beside it is the
+colour a reader sees when images are off.
+
+The picker has two tabs. **Library** shows the stock pictures whole, so a
+wordmark is never cropped. **Upload** has a drop zone, and opens with any files
+that came with a drop or a paste.
+
+`files` being non-empty does not mean "upload this". It means files were
+involved in the gesture. What you do with them is the decision the hook exists
+to let you make.
+
+## Why nothing enters the Document until you return
+
+This is the design point worth taking away.
+
+An outstanding upload is chrome, not content. Nothing is written to the
+Document until an Asset resolves, so a Document saved mid-upload can never
+contain a `blob:` URL that stops working an hour later. Open **HTML** in the
+example while an image is uploading and the email is complete and sendable
+without it.
+
+That is also why `place` can return `{ status: "requested" }`. The Block is not
+there yet, and may never be.
+
+The waiting state is drawn by the `pendingImage` and `failedImage` Slots, from
+`getImageRequests()`. See [the chrome](/example/chrome/).
+
+The example covers an image Block while it waits. For a background it draws a
+small progress pill at the Block's corner instead, so the section stays in
+view.
+
+## What had to be written
+
+**The gallery itself.** A dialog, a grid of stock pictures, an upload tab, a
+selected state. Ordinary application UI.
+
+**Progress reporting.** `onProgress(0.5)` is a number between 0 and 1 that you
+call. Where it comes from is yours — an `XMLHttpRequest` progress event, a
+chunked fetch, or a fake one for a gallery pick, which is what the example
+does.
+
+**Honouring the abort signal.** `request.signal` aborts when somebody cancels,
+or when the place they were inserting into goes away. Ignoring it leaves an
+upload running against a Block that will never exist.
+
+**Failure and retry.** The example has a "Demo: fail the upload" switch at
+the left of the footer, so the failure path is reachable. Rejecting the promise is all it takes; the retry
+comes from the `FailedImage` state.
+
+## Worth knowing before you copy it
+
+The example inlines the chosen picture as a data URL so the page works offline.
+A real product uploads to its own storage and returns a durable, absolute,
+public URL. See [Handle images and uploads](/guides/images/) for what an email
+needs from that URL.

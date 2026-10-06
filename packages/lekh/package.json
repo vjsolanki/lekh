@@ -1,0 +1,113 @@
+{
+  "name": "lekh",
+  "version": "0.0.0",
+  "private": true,
+  "description": "A headless engine for building drag-and-drop email editors: the Document, the editing mechanics, and the path to sendable markup.",
+  "keywords": [
+    "email",
+    "react",
+    "editor",
+    "drag-and-drop",
+    "headless",
+    "html-email",
+    "builder",
+    "react-email"
+  ],
+  "license": "MIT",
+  "author": "Vijay Solanki",
+  "homepage": "https://github.com/vjsolanki/lekh#readme",
+  "bugs": "https://github.com/vjsolanki/lekh/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vjsolanki/lekh.git",
+    "directory": "packages/lekh"
+  },
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./canvas": {
+      "types": "./dist/canvas.d.ts",
+      "default": "./dist/canvas.js"
+    },
+    "./blocks": {
+      "types": "./dist/blocks.d.ts",
+      "default": "./dist/blocks.js"
+    },
+    "./tiptap": {
+      "types": "./dist/tiptap.d.ts",
+      "default": "./dist/tiptap.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "goldens": "rm -rf src/preset/__goldens__ && vitest run --project node src/preset/goldens.test.tsx --update -t \"the golden HTML\"",
+    "size": "node --experimental-strip-types scripts/size.ts"
+  },
+  "peerDependencies": {
+    "@react-email/components": "^1.0.0",
+    "@tiptap/core": "^3.0.0",
+    "@tiptap/pm": "^3.0.0",
+    "@tiptap/starter-kit": "^3.0.0",
+    "react": "^18.3.0 || ^19.0.0",
+    "react-dom": "^18.3.0 || ^19.0.0"
+  },
+  "devDependencies": {
+    "@react-email/components": "^1.0.12",
+    "@tiptap/core": "^3.29.2",
+    "@tiptap/pm": "^3.29.2",
+    "@tiptap/react": "^3.29.2",
+    "@tiptap/starter-kit": "^3.29.2",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitest/browser": "^4.1.10",
+    "@vitest/browser-playwright": "4.1.10",
+    "ajv": "^8.20.0",
+    "fast-check": "^4.10.2",
+    "linkedom": "^0.18.13",
+    "playwright": "^1.62.1",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "rolldown": "^1.2.3",
+    "tsdown": "^0.22.14",
+    "typescript": "^7.0.2",
+    "vitest": "^4.1.10"
+  },
+  "peerDependenciesMeta": {
+    "@react-email/components": {
+      "optional": true
+    },
+    "@tiptap/core": {
+      "optional": true
+    },
+    "@tiptap/pm": {
+      "optional": true
+    },
+    "@tiptap/starter-kit": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@dnd-kit/dom": "0.5.0",
+    "@dnd-kit/react": "0.5.0"
+  }
+}

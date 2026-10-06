@@ -1,0 +1,288 @@
+---
+title: Handle images and uploads
+description: "Let people add pictures, and upload them to your own storage."
+---
+
+import { Code } from "@astrojs/starlight/components";
+import resolver from "../../../examples/images-resolver.tsx?raw";
+import block from "../../../examples/images-block.tsx?raw";
+import chrome from "../../../examples/images-chrome.tsx?raw";
+
+## What you'll do
+
+Let people add pictures to an email, and send every one of those pictures to
+your own storage on the way in.
+
+## The short version
+
+The library never uploads anything. When it needs a picture it asks you, and
+waits. You answer with an Asset: a URL plus the picture's width and height.
+
+Give `createEditor` a `resolveImage` function and images start working.
+
+<Code code={resolver} lang="tsx" title="images-resolver.tsx" />
+
+```ts
+const editor = createEditor({ definitions, rootType, resolveImage });
+```
+
+That is the whole hook. Every route a picture can arrive by comes back through
+this one function: dropped on the Canvas, pasted, added from the palette, or
+swapped for another.
+
+## Why an Asset, and not a URL
+
+An Asset carries four things:
+
+| Field    | Type     | What it is                                        |
+| -------- | -------- | ------------------------------------------------- |
+| `src`    | `string` | Where the picture lives.                          |
+| `width`  | `number` | Its real width, in pixels.                        |
+| `height` | `number` | Its real height, in pixels.                       |
+| `alt`    | `string` | What it says when pictures are blocked. Optional. |
+
+The size is not optional. Several mail clients draw a picture at its full size
+when the markup does not say otherwise, so a URL on its own cannot produce an
+email that looks the same twice.
+
+Nothing goes into the Document until your function returns. A Document saved
+mid-upload can never contain a `blob:` URL that stops working an hour later.
+
+## What the ask tells you
+
+Your function receives one request.
+
+| Field        | Type                                                  | What it is                                     |
+| ------------ | ----------------------------------------------------- | ---------------------------------------------- |
+| `reason`     | `"insert" \| "add" \| "replace" \| "drop" \| "paste"` | Why the library is asking.                     |
+| `files`      | `File[]`                                              | Files that came with the gesture. Often empty. |
+| `placement`  | `ImagePlacement`                                      | Where the picture will land.                   |
+| `onProgress` | `(fraction: number) => void`                          | Report 0 to 1. Optional — call it or don't.    |
+| `signal`     | `AbortSignal`                                         | Stop work that no longer matters.              |
+
+`files` being non-empty does not mean you have to upload. If your pictures
+already live in a digital asset manager, open that instead and ignore them.
+
+Use `reason` to behave differently per route: a gallery for `"insert"`, a
+straight upload for `"drop"`.
+
+## What to return
+
+| You return         | What happens                                            |
+| ------------------ | ------------------------------------------------------- |
+| An `Asset`         | It goes into the Document as one undoable step.         |
+| `undefined`        | Treated as cancelled. Nothing changes, nothing to undo. |
+| A rejected promise | Treated as failed. The person is offered a retry.       |
+
+Cancelling and failing both leave the Document exactly as it was.
+
+## Respect the abort signal
+
+The library aborts a request when the place the picture was going disappears,
+because someone deleted the Block or undid the step that made room for it. Pass
+`request.signal` to `fetch` and your upload stops when it stops mattering.
+
+## Put a picture in your own Block
+
+The built-in image Block already does all of this. You only need this part if
+you are writing your own.
+
+Declare one prop of kind `asset` and mark it `primary: true`. That is what
+marks a Block as an image, and it is how the library knows which Block a dropped
+file should become.
+
+<Code code={block} lang="tsx" title="images-block.tsx" />
+
+Read the stored value with `assetOf`. A Document holds whatever was saved into
+it, possibly by an older version of your code, so narrow it instead of trusting
+its shape.
+
+## One picture a Block is, any number it holds
+
+A Block can hold a picture without being one. A section with a photo behind its
+text is still a section. So an `asset` prop is one of two things:
+
+- **The Primary Asset**, marked `primary: true`. This is the picture the Block
+  _is_. A dropped or pasted file becomes the first Block with one, and placing
+  that Block asks for its picture first. A Block has at most one. Two throws
+  `EditorConfigurationError` when the editor is built.
+- **An optional Asset**, with no `primary`. A dropped file never becomes this
+  Block, and placing it asks for nothing. The section's and row's
+  `contentBackgroundImage` are optional Assets.
+
+**If you wrote your own image Block, add `primary: true`.** Without it, files
+dropped on the Canvas stop becoming that Block.
+
+An optional Asset still arrives through `resolveImage`, so it still resolves
+before it is saved. Name the prop when you ask:
+
+```ts
+editor.replaceImage(blockId, "replace", "contentBackgroundImage");
+```
+
+Clearing it needs no request:
+
+```ts
+editor.setProp(blockId, "contentBackgroundImage", undefined);
+```
+
+In your Inspector, `control.primary` is `true` for a Primary Asset. Offer a
+Primary Asset a "Replace" button. Offer an optional one "Choose image" while
+it is empty, then "Replace" and "Remove": `control.reset()` removes it.
+
+Neither kind can have a phone-only value. Declaring `mobile` on any `asset` prop
+throws.
+
+### Decorative images
+
+Some pictures are never shown with alt text. A background sits behind other
+content, and mail clients never read its alt text out. Mark that prop
+`decorative: true`:
+
+```ts
+backdrop: { kind: SchemaKind.asset, label: "Backdrop", defaultValue: undefined, decorative: true },
+```
+
+The request for that prop then has `placement.decorative` set to `true`. Your
+picker can skip the alt text field:
+
+```tsx
+const askAlt = !(
+  request.placement.kind === "replace" && request.placement.decorative
+);
+```
+
+An Agent is told the prop is decorative, so it writes no alt text for it.
+
+The shipped Blocks mark the section's and row's `contentBackgroundImage` and the
+email's `backgroundImage` decorative. A Primary Asset can't be decorative: the
+Block is the picture, and its alt text is what a reader sees with images off. Marking one throws `EditorConfigurationError`.
+
+## Pictures you already host
+
+Some pictures do not need an upload: your logo, your social icons. List them on
+the `asset` prop, and your users can pick one with no image request.
+
+```ts
+constraints: { options: [{ label: "Instagram", asset: instagram }] },
+```
+
+Each `asset` must already be at a URL that lasts, with its real width and
+height. Picking one is a plain `setProp`, and the picture is copied into the
+email. Any other new picture on that prop still goes through `resolveImage`:
+`setProp` refuses it. The Preset's icon row fills this list from its
+[`icons` option](/reference/blocks/#icons).
+
+## Draw the waiting state
+
+An upload in progress is not part of the email, so the library does not draw
+it. It hands you the position and lets you draw whatever fits your product.
+
+Fill the `pendingImage` and `failedImage` slots.
+
+<Code code={chrome} lang="tsx" title="images-chrome.tsx" />
+
+```tsx
+<Canvas slots={{ pendingImage: PendingImage, failedImage: FailedImage }} />
+```
+
+`rect` is already in the Canvas's coordinate space, so absolute positioning is
+all you need. The slot layer ignores pointer events, so set
+`pointerEvents: "auto"` on anything clickable.
+
+You can also read the same list yourself with `editor.getImageRequests()`, to
+show a count in your own toolbar for instance.
+
+## Swap a picture that is already there
+
+```ts
+editor.replaceImage(blockId);
+```
+
+This raises a request with `reason: "replace"`, or `reason: "add"` when the
+prop holds no picture yet. You don't have to check. Pass either one, and the
+request says which is true. The request's `placement` is
+`{ kind: "replace", blockId, prop }`, and `prop` is where the picture will land.
+With no third argument that is the Block's Primary Asset.
+
+It returns `false` if it cannot. That means no `resolveImage`, a Block with no
+Primary Asset, or a `prop` that is not an `asset` prop. Nothing changes until
+your function answers.
+
+## In depth
+
+### What email does to pictures
+
+**The URL has to be absolute, public and permanent.** An email is read outside
+your application, often years later, by a client with no session and no
+cookies. A path like `/uploads/hero.png` resolves against nothing. A signed URL
+that expires in an hour produces an email that is broken by the time somebody
+reads it on Monday.
+
+**Assume the picture does not load.** Many clients block remote images until
+somebody asks for them, and some readers never ask. That is why `alt` is on the
+Asset rather than left to each Block: the alt text is the email for a real
+share of your audience. Give the surrounding cell a background colour and the
+image a sensible size, so a blocked picture leaves a tidy space rather than a
+collapsed row.
+
+**Say the size in the markup, not only in the file.** Several clients draw a
+picture at its natural size when the markup does not say otherwise. This is why
+an Asset carries `width` and `height` and a bare URL is not enough.
+
+**Then let it shrink.** The width you emit is the most a picture gets, not the
+least. A column is narrower than the email, and a phone is narrower than both,
+so give the image `max-width: 100%` and `height: auto` together. The first lets
+the width give way; the second lets the height follow it. With only the first,
+a 552 by 414 photo on a 375px phone renders 311 wide and still 414 tall.
+
+**For a sharp picture on a high-density screen, upload at twice the size and
+render at half.** The Asset's `width` and `height` are the file's real
+dimensions. What the Block renders is your decision, so a 1200px file rendered
+into a 600px column is the ordinary retina trick. Nothing in the library needs
+to know you did it.
+
+**Keep the file small.** Some clients clip a message past a size limit, and
+Gmail's is famously about 102 kB of markup — images do not count towards that,
+but a slow-loading email with images blocked by default is worth avoiding on
+its own terms.
+
+### Where the picture actually lives
+
+The library never uploads anything. `resolveImage` is your function, so the
+storage decision stays yours: a digital asset manager, an S3 bucket behind a
+CDN, or a gallery of pictures somebody already uploaded.
+
+That is also why `files` being non-empty does not mean "upload this". A drop or
+a paste hands you the files that were involved. Handing them to an upload tab
+is one reasonable answer. Ignoring them and opening your existing gallery is
+another.
+
+## Common problems
+
+**Nothing happens when a file is dropped.** You have no `resolveImage`. The
+library leaves the drop to the browser instead of swallowing a file it has no
+way to store.
+
+**A file is dropped and no Block appears.** No Block in your definitions has a
+prop of kind `asset` marked `primary: true`, so there is nothing for a file to
+become.
+
+**Pictures look right in the browser and wrong in Gmail.** Your Asset's `width`
+and `height` do not match the file. Measure the real thing, not the box you are
+drawing it in.
+
+**A picture vanishes a while after upload.** You returned a `blob:` or
+`data:` URL from a temporary source. Return the durable location your storage
+gives back.
+
+**Uploads keep running after someone hits undo.** You are not passing
+`request.signal` through to your upload.
+
+## Why it works this way
+
+Uploading is your problem, not the library's: your storage, your access rules,
+your file limits. The library's job is to make sure nothing enters a saved
+email until there is a location that still works tomorrow.
+
+Read [Headless by design](/why/headless/).

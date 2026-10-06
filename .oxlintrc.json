@@ -1,0 +1,48 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["react", "typescript", "import", "promise", "unicorn"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error",
+    "pedantic": "warn"
+  },
+  "rules": {
+    "react/react-in-jsx-scope": "off",
+    "typescript/prefer-readonly-parameter-types": "off",
+    "unicorn/no-useless-undefined": "off",
+    "eslint/max-lines": "off",
+    "eslint/max-lines-per-function": "off",
+    "import/max-dependencies": "off"
+  },
+  "ignorePatterns": [
+    "**/dist/**",
+    "**/.astro/**",
+    "**/node_modules/**",
+    "apps/docs/src/components/ui/**"
+  ],
+  "jsPlugins": ["./lint/lekh.ts"],
+  "overrides": [
+    {
+      "files": [
+        "packages/lekh/src/**/*.test.ts",
+        "packages/lekh/src/**/*.test.tsx",
+        "packages/lekh/src/testing/**"
+      ],
+      "rules": {
+        "lekh/test-imports": [
+          "error",
+          {
+            "src": "packages/lekh/src",
+            "harness": "packages/lekh/src/testing",
+            "entryPoints": [
+              "packages/lekh/src/index.ts",
+              "packages/lekh/src/canvas.tsx",
+              "packages/lekh/src/blocks.tsx",
+              "packages/lekh/src/tiptap.tsx"
+            ]
+          }
+        ]
+      }
+    }
+  ]
+}

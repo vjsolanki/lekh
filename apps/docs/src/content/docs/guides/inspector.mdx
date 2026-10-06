@@ -1,0 +1,408 @@
+---
+title: Build an inspector
+description: "Render the panel where people edit the selected Block."
+---
+
+import { Code } from "@astrojs/starlight/components";
+import inspector from "../../../examples/tutorial/inspector.tsx?raw";
+import boxLock from "../../../examples/box-lock.ts?raw";
+import Demo from "../../../components/Demo.astro";
+
+## What you'll do
+
+Build the panel that edits whatever is selected, using your own form controls.
+
+## The short version
+
+The editor describes the selected Block's editable props as plain data. It
+renders no form. You switch on `kind` and draw a control.
+
+<Code code={inspector} lang="tsx" title="inspector.tsx" />
+
+## What a Control Descriptor carries
+
+| Field           | Type                       | What it is                                 |
+| --------------- | -------------------------- | ------------------------------------------ |
+| `name`          | `string`                   | The prop it edits.                         |
+| `kind`          | `string`                   | Which control to draw. An open string.     |
+| `label`         | `string`                   | From the Schema.                           |
+| `value`         | `unknown`                  | The current value.                         |
+| `constraints`   | `object?`                  | Whatever the Schema put there, untouched.  |
+| `blockId`       | `string`                   | The Block being edited.                    |
+| `set`           | `(value) => void`          | The whole write path. One undoable step.   |
+| `preview`       | `(value) => void`          | Show a value mid-drag, without saving it.  |
+| `commit`        | `(value?) => void`         | Save the drag as one undoable step.        |
+| `cancel`        | `() => void`               | Drop the drag.                             |
+| `origin`        | `Origin`                   | Where the value comes from.                |
+| `otherStage`    | `object?`                  | The other Stage's `value` and `origin`.    |
+| `overridable`   | `boolean`                  | Whether it can have a phone-only value.    |
+| `clearOverride` | `() => void`               | Drop the phone-only value.                 |
+| `direction`     | `"ltr" \| "rtl"?`          | On `align` only: which way the email runs. |
+| `box`           | `string?`                  | The Box this prop is one side of.          |
+| `side`          | `(BoxSide \| BoxSide[])?`  | Which side, or sides, of `box`.            |
+| `against`       | `string?`                  | On a colour: the colour behind it.         |
+| `clients`       | `{ client, note }[]?`      | What mail clients do with this value.      |
+| `advanced`      | `true?`                    | A setting to fold away by default.         |
+| `suggested`     | `{ value, suggestionId }?` | What the Suggestion in front would set.    |
+| `reset`         | `() => void`               | Clear the value set on this Block.         |
+
+`value` is `unknown` because your Blocks decide what a prop holds. Narrow it
+instead of casting. The example does this with a small `asText` helper.
+
+For sliders and colour pickers, wire `preview` and `commit` so a whole drag is
+one undo step. See [Make a drag one undo step](/guides/dragging/).
+
+## Nothing selected means the root
+
+`getControls()` describes the root Block when there is no selection. That is
+where whole-email settings live: background colour, content width, preview
+text.
+
+So an inspector is never empty, and you need no separate "email settings"
+screen. If you want one anyway, read the root explicitly:
+
+```ts
+editor.select(undefined);
+```
+
+## Re-rendering
+
+Select it. `getControls()` answers with the same array until the description
+changes — the document, the selection, or the stage — so an inspector written
+this way holds still while somebody types into a block it is not describing.
+
+```tsx
+const controls = useEditorState((editor) => editor.getControls());
+return controls.map(...);
+```
+
+`getAddableChildren()` and `getEditableChildren()` behave the same way. See
+[Subscribe to changes efficiently](/guides/subscribing/).
+
+## Unknown kinds
+
+Return `null` in your `default` case. Never throw.
+
+```tsx
+default:
+  return null;
+```
+
+That is what lets somebody add a Block with a new kind of prop without editing
+your switch. It also means composing an unfamiliar Preset degrades quietly
+instead of crashing the panel.
+
+To find gaps during development, log instead of ignoring:
+
+```tsx
+default:
+  if (import.meta.env.DEV) console.warn(`No control for kind "${control.kind}"`);
+  return null;
+```
+
+## The kinds you need to cover
+
+The built-in Preset uses these:
+
+`text`, `number`, `boolean`, `color`, `surface-color`, `select`, `align`, `url`,
+`width`, `rich-text`, `asset`
+
+Five want more than an ordinary input.
+
+`select` choices are plain values, or `{ label, value }` when a value needs a
+readable name. The root's font is one: show the label, store the value. A stored
+value that matches no choice shows as `Custom (<value>)`.
+
+`rich-text` is edited on the canvas, not in the panel: see
+[Let people type formatted text](/guides/rich-text/). `asset` opens your image
+picker: see [Handle images and uploads](/guides/images/).
+
+`width` is a number whose `min` and `max` the editor recalculates as the
+neighbouring columns move, so point your number input at it and read the
+constraints every render.
+
+`align` stores `start`, `center` or `end`. Start is the side the email reads
+from, so it is the right in a right-to-left email. Draw it there: the control
+carries the email's `direction`, so flip your icons when it is `"rtl"`.
+
+`surface-color` is a colour that may be no colour — a background, a band, a
+button's fill. Give it a way back to nothing by setting the exported `NONE`, and
+show the emptied state as something other than black:
+
+```tsx
+import { NONE, SchemaKind } from "lekh";
+
+case SchemaKind.surface:
+  return <ColorInput control={control} onClear={() => control.set(NONE)} />;
+```
+
+Do **not** offer that on a plain `color`. Those are ink — text, borders, a
+divider's rule — and `color: none` is not a colour. The split between the two
+kinds exists so your panel can tell them apart.
+
+For the rest, an ordinary input is enough.
+
+## Constraints
+
+Whatever the Schema declared arrives untouched:
+
+```ts
+fontSize: {
+  kind: "number",
+  label: "Font size",
+  defaultValue: 16,
+  constraints: { min: 12, max: 48, unit: "px" },
+},
+```
+
+The library never validates against them. They are a message from the Block
+author to you, and enforcing them is your control's job.
+
+## Where a value comes from
+
+`origin` says where `value` comes from on the Stage you're showing. It is one
+of these, and the first one that holds a value wins:
+
+| `origin`     | The value comes from                        |
+| ------------ | ------------------------------------------- |
+| `"override"` | The phone-only value. Only on mobile.       |
+| `"block"`    | This Block.                                 |
+| `"email"`    | The email. Some colours follow the email's. |
+| `"default"`  | The Schema's default.                       |
+
+Show it as one plain line under each control. It tells your users what they
+are changing. `"email"` matters most: changing the email's colour will move
+this Block, and setting one here stops that.
+
+On desktop, `reset` clears the Block's own value, so a colour that follows the
+email follows it again:
+
+```tsx
+{
+  control.origin === "block" && (
+    <button type="button" onClick={control.reset}>
+      Use email color
+    </button>
+  );
+}
+```
+
+That lands on the email's value, not the default. To offer "Reset to default"
+whenever `origin` isn't `"default"`, set the Schema's default outright:
+
+```tsx
+{
+  control.origin !== "default" && (
+    <button type="button" onClick={() => control.set(defaultValue)}>
+      Reset to default
+    </button>
+  );
+}
+```
+
+On mobile, `reset` drops the phone-only value, the same as `clearOverride`.
+
+## Phone-only values
+
+On the mobile Stage, `getControls()` describes **only** the props that can have
+a phone-only value, so nobody is offered a change that would do nothing.
+
+`otherStage` holds the other Stage's `value` and `origin`. It is absent when
+the prop can't have a phone-only value, since then both Stages always agree.
+
+On mobile, show the desktop value, so nobody breaks desktop by accident. On
+desktop, an `otherStage.origin` of `"override"` means mobile differs.
+
+On mobile, `clearOverride` drops the phone-only value, so the prop follows
+desktop again:
+
+```tsx
+{
+  control.origin === "override" && control.otherStage && (
+    <button type="button" onClick={control.clearOverride}>
+      Use desktop, {String(control.otherStage.value)}
+    </button>
+  );
+}
+```
+
+See [Make emails work on phones](/guides/responsive/).
+
+## Contrast while dragging
+
+A colour's Control Descriptor carries `against`: the colour of the Surface
+behind it, such as a button's fill under its label. A Surface is something a
+colour is painted on, like a Block's background.
+
+Use `against` to draw a live contrast meter while your users drag a text
+colour. Work out the ratio between the dragged colour and `against`, and show
+it beside the control.
+
+Diagnostics read the saved Document, not a drag in progress. So the contrast
+warning under the field updates when the drag is let go. The meter is your own
+maths in between.
+
+`against` is absent when nothing can be sure what is behind the colour: a
+background image lies between, a colour can't be read, or nothing beneath has
+one.
+
+## Brand Colours
+
+Brand Colours are named colours you offer beside every colour field. Pass them
+to the Preset as `colors`, and each colour's Control Descriptor carries them in
+`constraints.brandColors`. Read them with `brandColorsOf`:
+
+```ts
+import { brandColorsOf } from "lekh";
+
+const brand = brandColorsOf(control.constraints); // [{ label, value }]
+```
+
+Draw each as a color that calls `control.set(color.value)`. Store the value,
+never the label. Keep a hex field beside them, so your users can still pick any
+other colour.
+
+The example editor adds a second row: the colours already in this email. It
+walks the Document's colour props itself, since which colours to reuse is your
+Inspector's call.
+
+## Boxes
+
+A Box is a Block's spacing on up to four sides, edited as one thing. Each side
+is still its own prop, with its own phone-only value. The Schema says which
+props form a Box:
+
+```ts
+paddingTop: { kind: "number", label: "Top", defaultValue: 0, box: "padding", side: "top" },
+innerY: { kind: "number", label: "Inner", defaultValue: 12, box: "inner", side: ["top", "bottom"] },
+```
+
+Each Control Descriptor carries `box` and `side`. Draw the ones that share a
+`box` as one control. A button has two: its outer padding, and the room round
+its label.
+
+Nothing stores whether a Box is locked. It is locked when all its sides have
+the same `value`. To move every side together, open one Pending Change on all
+of them, then commit. That is one undo step. On mobile, it writes a phone-only
+value for every side. Hand `clearMobileOverride` a list to drop them all as one
+undo step:
+
+<Code code={boxLock} lang="ts" title="box-lock.ts" />
+
+On the canvas, the `boxEdges` Slot gets each side's edge, naming its prop, for
+grips you drag. See [Box edges](/reference/canvas/#box-edges).
+
+`defineBlock` throws if an entry has a `box` and no `side`, or the other way
+round, or if two props claim the same side of one Box.
+
+## Mail Client Notes
+
+A Mail Client Note says what a mail client will do with a value that your
+users would not expect. Classic Outlook for Windows shows a rounded button with
+square corners, for example. The Schema entry declares its notes, because only
+the Block knows what its markup does in each client:
+
+```ts
+radius: {
+  kind: "number",
+  label: "Corner radius",
+  defaultValue: 0,
+  clients: [{ client: "outlook-windows", when: (v) => v > 0, note: "Shows square corners" }],
+},
+```
+
+The Control Descriptor carries `clients`: the notes whose `when` holds for the
+current `value`, each as `{ client, note }`. `clients` is absent when no note
+applies.
+
+Draw a note as a quiet line under the field. Keep it apart from Diagnostics. A
+note says how a client behaves, not that anything is wrong, and it never shows
+in `getDiagnostics()`.
+
+The Preset's notes come from [caniemail](https://www.caniemail.com/), and each
+says in its source when it was last checked. Support changes, so date your own
+notes too.
+
+## Folding advanced settings
+
+Mark a Schema entry `advanced` when your users rarely need it, such as a
+border or the space inside a button:
+
+```ts
+borderWidth: {
+  kind: "number",
+  label: "Border width",
+  defaultValue: 0,
+  advanced: true,
+},
+```
+
+The Control Descriptor carries `advanced: true`. Fold those fields away, so the
+common ones are easy to find. If a group holds only advanced fields, fold the
+whole group. If it mixes both, put the advanced ones in a "More" fold at its
+end.
+
+Name what is set in a closed fold, so your users see a Block's real state
+without opening it: "More · Border width 2px". A field counts as set when its
+`origin` is not `"default"`.
+
+Name a Box once, by its sides. With nothing set, the title stays "More", or the
+group's name. Once the fold is open, show just its name, since the fields say
+the rest.
+
+If you add a filter box, match it against every label, folded ones too, and
+open the fold of each match. `advanced` changes nothing in the email, and your
+agent is not told it.
+
+The Preset marks the space inside a button, every border field and "Show on"
+as advanced. A column's is labelled "Show this column on".
+
+## Suggestions in the fields
+
+A Suggestion is a change your agent proposes. Your users accept or reject it.
+When one touches the selected Block, show it in the fields it would change.
+
+`suggested` holds `{ value, suggestionId }`: what the Suggestion in front would
+set this field to, and which Suggestion that is. `value` stays the stored value.
+So draw `value` struck through, and `suggested.value` beside it.
+
+It follows the Stage. A phone-only value shows only on the mobile Stage. A
+desktop value shows on the mobile Stage too, unless a phone-only value holds
+that field. It is absent while the Suggestion is still arriving, once it goes
+stale, when it would leave the value as it is, and while nothing is selected.
+
+The Suggestion in front is the first of `getSuggestionsAt(selected)`. Read your
+card's reason from its `note`, and accept it with its `accept()`. To show the
+email without it while a button is held, pass its id to the Canvas as
+`showOriginal`.
+
+## Try it
+
+One Block, four props. On the left is what you draw; below it is exactly what
+`getControls()` handed you, and below that the markup it produces.
+
+<Demo name="controls" />
+
+## Common problems
+
+**The panel is blank.** Nothing is selected _and_ your root Definition has an
+empty Schema. Give the root something to edit.
+
+**Typing loses focus after each character.** You are rebuilding the control
+component on every render. Define it outside, or key it by `control.name`.
+
+**Infinite re-render loop.** `getControls()` in `useSyncExternalStore`.
+
+**A control shows the old value.** You are not subscribed. `useEditor()` alone
+does not re-render.
+
+**Nothing appears on the mobile Stage.** Correct — no prop in that Block opted
+in to phone-only values.
+
+## Why it works this way
+
+Describing controls as data instead of rendering them is what keeps the panel
+yours: your design system, your layout, your ordering. And a prop kind the
+library has never heard of works exactly as well as a built-in one.
+
+Read [Headless by design](/why/headless/).

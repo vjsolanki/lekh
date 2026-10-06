@@ -1,0 +1,179 @@
+---
+title: Change a block after emails exist
+description: "Rename, split or remove a prop without breaking saved emails."
+---
+
+import { Code } from "@astrojs/starlight/components";
+import block from "../../../examples/migrations-block.tsx?raw";
+
+## What you'll do
+
+Change the shape of a Block when there are already emails saved that use the
+old shape.
+
+## The short version
+
+Bump `version`, and add a function under that number saying how to get there
+from the version before. It gets the Block's `props` and its phone-only values,
+`mobile`, and returns both.
+
+<Code code={block} lang="tsx" title="migrations-block.tsx" />
+
+Old emails are brought forward as they load. You never render an out-of-date
+shape, and nothing is rewritten in your database until the email is next saved.
+
+## How it runs
+
+A Block stores the version it was written at. Absent means `0`.
+
+On load, the library runs every migration from `stored + 1` up to your
+`version`, in order. A Block at version 0 with `version: 2` runs `1` then `2`.
+
+A Block already at your current version runs nothing.
+
+## Versions are per Block, not per library
+
+Your Blocks are your code. Version them on your own schedule. An independently
+published Block can move from 3 to 4 without anybody releasing anything else.
+
+This is also why upgrading lekh does not break saved emails. The library's
+version and your Blocks' versions have nothing to do with each other.
+
+A breaking change to the API is a change to code you write. A saved email names
+Block types and holds props, so nothing in it points at a function signature.
+Upgrading can make your editor stop compiling. It cannot make an email you
+stored last year stop loading.
+
+## The four changes you will actually make
+
+### Renaming a prop
+
+```ts
+1: ({ props, mobile }) => ({
+  props: { ...props, label: props["text"], text: undefined },
+  mobile,
+}),
+```
+
+Set the new key, clear the old one. Pass `mobile` through.
+
+### Splitting one prop into two
+
+Read the old value, work out both new ones, clear the old key. The example
+above does this with `padding`.
+
+If the old prop has a phone-only value, split that too. It lives in `mobile`,
+under the old name. Leave it there and the phone-only value is lost, because no
+prop has that name any more.
+
+### Changing what a value means
+
+Going from a number of pixels to a `"small" | "medium" | "large"` choice:
+
+```ts
+2: ({ props, mobile }) => ({
+  props: {
+    ...props,
+    size: typeof props["size"] === "number" && props["size"] > 20 ? "large" : "medium",
+  },
+  mobile,
+}),
+```
+
+### Removing a prop
+
+```ts
+3: ({ props, mobile }) => ({
+  props: { ...props, oldThing: undefined },
+  mobile,
+}),
+```
+
+You can also delete it from the Schema and leave the value sitting there.
+It resolves to nothing and is never rendered. A migration is tidier, but the
+email works either way.
+
+## Writing one that will not bite you
+
+**Props arrive as `unknown`.** They were written by an older version of your
+code, possibly years ago. Narrow instead of trusting:
+
+```ts
+const padding = typeof props["padding"] === "number" ? props["padding"] : 12;
+```
+
+**Never throw.** A migration that throws takes the whole email with it. Fall
+back to a sensible default instead.
+
+**Return `mobile`, even if you never touch it.** Leave it out and the Block
+loses every phone-only value it had.
+
+**Never change other Blocks.** A migration receives one Block's `props` and
+`mobile`, and returns the same Block's. It cannot see the tree, on purpose.
+
+**Never delete a migration**, even one from years ago. Somewhere there is an
+email still at that version, and removing the step breaks the chain.
+
+**Keep them pure.** No fetching, no clock, no randomness. They run on load,
+possibly on a server, possibly many at once.
+
+## Renaming a whole Block type
+
+Migrations bring props forward. They cannot change a Block's `type`.
+
+To rename a type, keep the old Definition registered as well, rendering the
+same thing:
+
+```ts
+const definitions = [newCallout, oldCalloutAlias];
+```
+
+Then migrate your saved emails in your own database when you are ready. Drop
+the alias once nothing uses it.
+
+Delete the old Definition without doing that, and every email holding one
+raises a `block-unregistered` error and refuses to render.
+
+## Testing them
+
+Migrations are plain functions. Test them as such:
+
+```ts
+expect(
+  button.migrations![1]({ props: { text: "Buy" }, mobile: undefined }),
+).toEqual({
+  props: { label: "Buy", text: undefined },
+  mobile: undefined,
+});
+```
+
+Keep one real saved email from each old version as a fixture, load it through
+`createEditor`, and check what comes out. That catches chains, which testing
+each step alone does not.
+
+## Common problems
+
+**Old emails render blank.** Your migration returned a new object without
+spreading the old props. Start with `...props`.
+
+**Phone-only values vanish after an upgrade.** Your migration left `mobile` out
+of what it returned. Pass it through.
+
+**The migration never runs.** You added the function but did not bump
+`version`, or you keyed it under the version it runs _on_ rather than the one
+it produces.
+
+**It runs every load and never sticks.** That is correct. Nothing is written
+back until the email is next saved, on purpose: loading an email to preview it
+should not rewrite your database.
+
+**Everything breaks after skipping a number.** Keys must be a run with no gaps
+from 1 up to `version`.
+
+## Why it works this way
+
+A Block in a saved email is data: a type, some props, maybe children. It
+carries no code, which is exactly why an email written two years ago can be
+rendered by today's Definition.
+
+Read [Core ideas](/core-ideas/).

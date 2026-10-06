@@ -1,0 +1,79 @@
+/* The motion the agent example uses, on the editor's one curve and durations. */
+
+/* A Block the agent is reading or writing: a slow sweep of green, not a spinner. */
+.agent-shimmer {
+  background-image: linear-gradient(
+    100deg,
+    transparent 30%,
+    color-mix(in srgb, var(--primary) 14%, transparent) 50%,
+    transparent 70%
+  );
+  background-size: 250% 100%;
+  animation: agent-sweep 1.3s linear infinite;
+}
+
+@keyframes agent-sweep {
+  from {
+    background-position: 120% 0;
+  }
+  to {
+    background-position: -120% 0;
+  }
+}
+
+.agent-dot {
+  display: block;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: currentColor;
+  animation: agent-dot 900ms var(--ease) infinite;
+}
+
+@keyframes agent-dot {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+
+/* A message arriving: rises a few pixels, fades in. */
+.card-in {
+  animation: card-in var(--duration-land) var(--ease) both;
+}
+
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+/* A popover grows out of the corner it is anchored to. */
+.pop-in {
+  transform-origin: var(--origin, top left);
+  animation: pop-in var(--duration-land) var(--ease) both;
+}
+
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .agent-shimmer {
+    animation: none;
+    background: color-mix(in srgb, var(--primary) 8%, transparent);
+  }
+  .agent-dot {
+    animation: none;
+    opacity: 0.6;
+  }
+}

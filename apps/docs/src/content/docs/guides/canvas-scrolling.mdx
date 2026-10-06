@@ -1,0 +1,143 @@
+---
+title: Give the canvas a height
+description: "Two ways to make a long email scroll, and why a height in `style` is not one of them."
+---
+
+## What you'll do
+
+Decide where the scrolling lives, so a long email scrolls and the outlines stay
+on the Blocks they belong to.
+
+## The short version
+
+Two options. Both are fine.
+
+```tsx
+// The canvas scrolls itself.
+<Canvas height="100vh" />
+```
+
+```tsx
+// Your layout scrolls it.
+<div style={{ height: "100vh", overflowY: "auto" }}>
+  <Canvas />
+</div>
+```
+
+There is a third thing that looks like it should work and does not:
+
+```tsx
+<Canvas style={{ height: "100vh" }} /> // ✗ clips the chrome at the fold
+```
+
+## Which one to pick
+
+Use **`height`** when the canvas is the whole pane. Nothing else is in the
+scrolling region, and you would rather not think about it.
+
+Use **your own scroller** when something else has to move with the email: a
+caption under it, a background that scrolls with the sheet, anything you would
+rather not have to keep in step yourself.
+
+Both keep the outlines welded to their Blocks. Pick on layout, not behaviour.
+
+The example editor uses `height`, so its measure and its crop marks stay put and
+read as a window onto the email — the email moves, the frame around it does not.
+
+## Gotchas
+
+### The scrollbar comes out of the email, not out of the room around it
+
+`height` puts the scroller **inside** the canvas's box, so the bar and the email
+share `width`. Where scrollbars are drawn inline rather than overlaid — Windows,
+Linux, and macOS set to always show them — that bar takes 15px the email was
+using, and the email overflows sideways by exactly that much. You get a second,
+nearly-full-width scrollbar that scrolls fifteen pixels.
+
+```tsx
+<div style={{ width: 600 }}>
+  <Canvas width={600} height="100%" /> {/* ✗ 600px of email, 585px of room */}
+</div>
+```
+
+Only a pane pinned to exactly the email's width has this problem. Any spare room
+absorbs the bar and nothing happens, which is why `height="100vh"` in an
+ordinary pane needs none of this.
+
+If your pane is deliberately the email's width, add the gutter yourself:
+
+```tsx
+const SCROLLBAR = 15;
+
+<div style={{ width: 600 + SCROLLBAR }}>
+  <Canvas width={600} height="100%" />
+</div>;
+```
+
+Then paint the paper on that box rather than on the canvas, so the gutter is
+paper too and the bar has something to sit on. The example editor does both.
+
+### `height` in `style` is not the same prop
+
+`style` lands on the canvas element, which is the sheet — so a height there
+clips the chrome instead of scrolling it. See below.
+
+### The email's own `vh` stops meaning the window
+
+The frame is no longer a viewport, so `vh` units and `position: fixed` inside an
+email do not resolve against one. No mail client supports either, so an email
+relying on them was already broken where it counts.
+
+Widths are untouched. The frame is still exactly `width` wide and media queries
+still resolve against it — only its height stopped being a viewport.
+
+## Why not a height in `style`
+
+`style` lands on the canvas element, and the canvas element is the sheet the
+email is drawn on. It is always exactly as tall as the email.
+
+That is not an oversight. Every outline, drop indicator and toolbar is
+positioned against that element with `inset: 0`. Make it 600px tall inside a
+3000px email and the chrome layer is 600px tall too — so anything below the
+fold is clipped away, and you get a canvas that neither scrolls nor draws.
+
+`height` avoids this by wrapping the sheet in a scroller of its own, leaving the
+sheet full height inside it.
+
+## Why the frame does not scroll
+
+The email renders in an iframe. That iframe is sized to its content and scrolls
+nothing.
+
+If it scrolled internally, the email would move and the chrome would not — the
+chrome lives in your document, positioned from numbers measured inside the
+frame. Keeping them in step would mean recomputing on every scroll event, and a
+scroll event always arrives _after_ the scroll has painted. The outlines would
+trail the Blocks and snap into place when you stopped.
+
+With one scroller holding both, there is nothing to keep in step. The browser
+moves them together and the numbers never change.
+
+This is what costs the email its viewport, which is the `vh` gotcha above.
+
+## Scrolling to a Block
+
+You do not have to write this. The canvas answers `reveal` itself — it finds
+whichever element holds the overflow, yours or its own, and scrolls it.
+
+```ts
+editor.reveal(blockId); // the canvas scrolls it into view
+```
+
+`onReveal` is still there if you want to know a reveal happened — to
+flash a highlight, say. It is not what makes the scrolling work.
+
+## Edge scrolling during a drag
+
+Also free. Drag a Block near the top or bottom of what you can see and the
+canvas keeps scrolling, so carrying a Block a long way stays one gesture.
+
+The edge zone is measured against the visible box — your scroller's, or the
+one `height` made — not against the email. Near the bottom of a 3000px email
+is not the same as near the bottom of the screen, and it is the screen that
+matters.

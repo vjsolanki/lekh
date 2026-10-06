@@ -1,0 +1,67 @@
+{
+  "root": {
+    "id": "root",
+    "type": "email",
+    "version": 0,
+    "props": { "previewText": "Your account is ready", "language": "en" },
+    "children": [
+      {
+        "id": "hero",
+        "type": "section",
+        "version": 2,
+        "props": {
+          "contentBackgroundColor": "#ffffff",
+          "paddingTop": 32,
+          "paddingRight": 24,
+          "paddingBottom": 32,
+          "paddingLeft": 24
+        },
+        "mobile": { "paddingRight": 16, "paddingLeft": 16 },
+        "children": [
+          {
+            "id": "logo",
+            "type": "image",
+            "version": 2,
+            "props": {
+              "asset": {
+                "src": "https://example.com/logo.png",
+                "width": 240,
+                "height": 80,
+                "alt": "Acme"
+              },
+              "width": 120,
+              "align": "center",
+              "href": "https://example.com"
+            }
+          },
+          {
+            "id": "title",
+            "type": "heading",
+            "version": 3,
+            "props": { "content": "Welcome to <strong>Acme</strong>" },
+            "mobile": { "fontSize": 22 }
+          },
+          {
+            "id": "intro",
+            "type": "text",
+            "version": 2,
+            "props": {
+              "content": "<p>Your account is ready.</p><ul><li>Pick a plan</li><li>Invite your team</li></ul><p>Questions? <a href=\"mailto:help@example.com\">Write to us</a>.</p>"
+            }
+          },
+          {
+            "id": "cta",
+            "type": "button",
+            "version": 2,
+            "props": {
+              "label": "Open your dashboard",
+              "href": "https://example.com/dashboard",
+              "backgroundColor": "#0b57d0"
+            },
+            "mobile": { "align": "center" }
+          }
+        ]
+      }
+    ]
+  }
+}

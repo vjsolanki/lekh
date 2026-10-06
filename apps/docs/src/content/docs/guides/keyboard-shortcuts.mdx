@@ -1,0 +1,182 @@
+---
+title: Add keyboard shortcuts
+description: "Wire up undo, delete, duplicate and the rest."
+---
+
+## What you'll do
+
+Get the shortcuts people expect, change the ones that clash with your app, and
+drive the same actions from your own buttons.
+
+## The short version
+
+They already work. Put a canvas on screen and ⌘Z, Delete and ⌘D do what they
+should. Escape, Enter and the arrows move the selection around the email.
+
+To change them, pass a keymap. It is merged over the default:
+
+```tsx
+<Canvas keymap={{ "Mod+d": null, "Mod+Shift+d": "duplicate" }} />
+```
+
+`null` frees a binding your app already owns.
+
+## The default keymap
+
+| Binding                | Command            | Does                                         |
+| ---------------------- | ------------------ | -------------------------------------------- |
+| `Mod+z`                | `undo`             | Step back one action.                        |
+| `Mod+Shift+z`, `Mod+y` | `redo`             | Step forward.                                |
+| `Backspace`, `Delete`  | `delete`           | Remove the selected Block.                   |
+| `Mod+d`                | `duplicate`        | Copy it and everything under it.             |
+| `Mod+Shift+ArrowUp`    | `moveUp`           | Swap with the Block above.                   |
+| `Mod+Shift+ArrowDown`  | `moveDown`         | Swap with the Block below.                   |
+| `Escape`               | `stepOut`          | Leave the text, then go up to the parent.    |
+| `Enter`                | `selectFirstChild` | Go into the first Block, or start typing.    |
+| `ArrowUp`              | `selectPrevious`   | Select the Block before, in the same parent. |
+| `ArrowDown`            | `selectNext`       | Select the Block after, in the same parent.  |
+
+`Mod` is Command on Apple platforms and Control everywhere else. Write `Mod`,
+not `Cmd` or `Ctrl`, and both work.
+
+A binding is a `+`-separated string: `"Mod+Shift+z"`.
+
+## Moving around with the keyboard
+
+Escape backs out one level at a time. If someone is typing, it leaves the text
+and keeps the Block selected. Next it selects the parent. At the top it clears
+the selection. The root is never selected this way.
+
+Enter goes back in. It selects the first Block inside the selected one. On a
+text Block with nothing inside, it starts typing.
+
+The up and down arrows select the Block before or after, inside the same
+parent.
+
+None of these land on a column. A column belongs to its row, so Escape from a
+Block in a column selects the row. The arrows walk the Blocks in a row's
+columns as one list.
+
+Enter and the arrows leave a focused button, link or menu in your page alone.
+They also leave the key alone when there is nowhere to step, so your page still
+scrolls.
+Escape leaves a dialog or menu alone. Space on a focused Block picks it up to
+move with the arrows.
+
+## The same actions from your own buttons
+
+```tsx
+const commands = useCommands();
+
+<button type="button" onClick={commands.duplicate}>
+  Duplicate
+</button>;
+```
+
+Your toolbar button and the keystroke it advertises run the same code, so they
+cannot drift apart.
+
+Outside React, `createCommands(editor)` from `lekh` gives you the same object.
+
+## Disable, do not refuse
+
+Every command returns whether it did anything. To know before it runs, ask
+`commands.can`, which has a check for each command.
+
+```tsx
+<button type="button" disabled={!commands.can.undo()} onClick={commands.undo}>
+  Undo
+</button>
+```
+
+Each check uses the same rule as its command, so a button is greyed out exactly
+when pressing it would do nothing.
+
+`can.undo()` reports what undo would **actually** find, not merely whether
+anything was ever recorded. A text edit whose Block has scrolled out of the
+canvas cannot be carried out any more, and `can.undo()` accounts for that.
+
+`can.delete`, `can.duplicate`, `can.moveUp` and `can.moveDown` are all `false`
+when nothing is selected.
+
+Remember to subscribe, or your buttons will show a stale enabled state. See
+[Subscribe to changes efficiently](/guides/subscribing/).
+
+## Undo steps in actions, not Ops
+
+One thing somebody did is one step back, however many Ops it took.
+
+Dropping an image is an insert, a selection and a request leaving the list.
+⌘Z once takes back all three. So does clicking "Fix it" on a problem, however
+many props it changed.
+
+## Typing does not eat your shortcuts
+
+While somebody is typing in a rich-text Block, most bindings stand aside so the
+text engine can handle them. ⌘Z undoes typing, and Backspace deletes a
+character instead of the Block.
+
+⌘Z, ⌘⇧Z and Escape still fire. Enter and the arrows stay with the text. You do
+not have to manage this.
+
+Escape ends the typing, not the selection, so the Block is still there to drag
+or delete. Map it to `null` if your app wants the key for something else.
+
+## Adding your own shortcuts
+
+The keymap only maps to the eleven built-in commands. For anything else, such as
+save, preview or opening the palette, use your own key handler alongside it:
+
+```tsx
+useEffect(() => {
+  const onKey = (event: KeyboardEvent) => {
+    if (event.key === "s" && (event.metaKey || event.ctrlKey)) {
+      event.preventDefault();
+      void save();
+    }
+  };
+  window.addEventListener("keydown", onKey);
+  return () => window.removeEventListener("keydown", onKey);
+}, []);
+```
+
+Free the binding in the canvas keymap first if it clashes.
+
+## Tell people what the shortcuts are
+
+Nobody discovers `Mod+Shift+ArrowUp` by accident. Put the binding on the button
+that does the same thing:
+
+```tsx
+<button title="Duplicate (⌘D)" onClick={commands.duplicate}>
+  Duplicate
+</button>
+```
+
+If you changed a binding, change the label with it. To list every shortcut,
+read `defaultKeymap` from `lekh/canvas` and merge your own keymap over it, the
+same way the canvas does.
+
+## Common problems
+
+**No shortcuts work at all.** The canvas does not have focus, or it is outside
+`EditorProvider`.
+
+**⌘S saves the page instead of the email.** You need your own handler with
+`preventDefault`. The canvas keymap does not cover it.
+
+**Delete removes a Block while somebody is typing.** That should not happen, so
+report it. As a stopgap, map `Backspace` to `null` and handle it yourself.
+
+**A shortcut clashes with the browser's.** Some are not interceptable at all
+(⌘N, ⌘W). Pick another.
+
+**Buttons show the wrong enabled state.** You are not subscribed.
+
+## Why it works this way
+
+Bindings resolve to named commands instead of to functions, so a keystroke and
+a toolbar button are two ways of asking for one thing. That is what stops them
+disagreeing about when an action is available.
+
+Read [The op log and undo](/why/op-log/).

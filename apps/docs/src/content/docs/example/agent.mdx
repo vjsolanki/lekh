@@ -1,0 +1,184 @@
+---
+title: "The example: the agent chat"
+description: "A chat tab beside the Inspector and an Ask button on every Block, plugged into the example editor, with Suggestions drawn on the Canvas."
+---
+
+`src/components/agent/`, plugged into the editor at [/editor/](/editor/).
+
+## What it does
+
+The chat is a tab beside the Inspector, the panel that edits the selected
+Block's settings. Both share one column. It starts closed,
+so the Inspector shows first. Press **Ask** in the top bar, or the **Agent**
+tab, to open it.
+
+Open the editor and click any Block, one piece of the email such as a heading
+or a button. It joins the chat's composer as a chip, so the next ask is about
+that Block. With no Block selected, the ask is about the whole email.
+
+The Block's toolbar also gets an **Ask** button. It opens a small prompt under
+the Block, with a few quick asks for its type. Asks from either place land in
+the same chat. When the agent answers while the chat is hidden, the Agent tab
+gets a dot.
+
+Each answer leaves a Suggestion on the Canvas, the editing surface the email
+is drawn in. A Suggestion is a change shown on the Canvas but not stored until
+it is accepted. Accept it, and one undo takes it all back. Reject it, and
+nothing changed.
+
+Accept or reject it from the bar on the Block, or with ⌘↵ and ⌘⌫. The card in
+the chat says where it stands and links to it on the Canvas. Select a Block a
+Suggestion touches and the column flips to the Inspector, where you review the
+change in its fields. A card there gives the reason and Accept. Hold ⌥ to
+see the email without it. Leave several open and keep editing. One that the email
+changed under shows as out of date. It offers only to go away.
+
+Once you decide, the agent's message stays as it was. A line under it says
+what you decided: "Accepted 3 changes" or "Rejected". After an accept, it has
+Undo while the accept is still the newest step. Change the email, or have a
+peer change it, and Undo goes, so it never takes back something else.
+
+### A first draft
+
+Delete every Block and a prompt opens in the middle of the email, with a few
+starters. Type a sentence or tap a starter. The draft streams in, a section at
+a time.
+
+While it streams, a line in the chat names the newest change, such as "Adding
+a Button".
+
+Press Stop, in the chat or on the bar, and the agent stops writing. What has
+arrived stays as a finished Suggestion, so you can still accept it.
+
+The draft arrives as one Suggestion. Reject it, and the email is empty again
+with nothing to undo. Your prompt comes back in the box, to change and send
+again.
+
+The agent is scripted, so the page needs no model and no key. It knows a few
+phrases per Block type, such as "shorter", "add a P.S. under it" and "make the
+buttons teal". It still reads and suggests through the real agent
+tools from `lekh`, the same calls a model would make.
+
+## How it plugs in
+
+The agent code stays in its own folder. The editor takes it as an optional
+`agent` prop, and works the same without one: no Agent tab, no Ask button, and
+⌘K runs Commands only. A Command is a named editing action, such as undo or
+delete. With one, anything typed in ⌘K that is not a Command is an ask about
+the selected Block, or the whole email.
+
+```ts
+function EmailEditor(props: {
+  agent?: (editor: Editor) => AgentPart;
+}): ReactNode;
+```
+
+`plug.tsx` passes `createAgent`, and that is what `/editor/` shows. The editor
+calls it once, when it builds its editor. The `AgentPart` that comes back has
+these parts:
+
+| Part          | What the editor does with it                                               |
+| ------------- | -------------------------------------------------------------------------- |
+| `slots`       | Hands it the editor's own Slots, and gives the Canvas the ones it returns. |
+| `Provider`    | Puts it around the whole editor, so the chat and the Slots share state.    |
+| `Panel`       | Draws it as a tab beside the Inspector. **Ask** in the top bar opens it.   |
+| `BlockAction` | Draws it first on the selected Block's toolbar.                            |
+| `Start`       | Draws it in the middle of the email while the email has no Blocks.         |
+| `ask`         | Sends it what is typed in the ⌘K palette that is not a Command.            |
+| `subscribe`   | Listens for the agent's replies, to put a dot on its tab.                  |
+| `dispose`     | Calls it when the editor goes.                                             |
+
+A Slot is a component you give the Canvas, and it hands you the rectangles to
+draw in. So the agent never draws a top bar, an undo or a status bar. The
+editor has one of each, and the palette, the outline and the checks stay in
+reach while your users ask.
+
+## The files
+
+| File             | What it holds                                                     |
+| ---------------- | ----------------------------------------------------------------- |
+| `plug.tsx`       | `createAgent`, the part the editor takes, and the editor with it. |
+| `session.ts`     | The chat's state, one agent turn, and which phase the chat is in. |
+| `agent.ts`       | The scripted agent, and the quick asks for each Block type.       |
+| `first-email.ts` | The first draft, one batch of Edits per section, and starters.    |
+| `start.tsx`      | The prompt in the middle of an empty email.                       |
+| `slots.tsx`      | The Ask button, the prompt it opens, and the `suggestion` Slot.   |
+| `chat.tsx`       | The conversation, its cards and the composer.                     |
+| `parts.tsx`      | The before and after list, the status chips, and shared state.    |
+| `receipt.ts`     | When the line under an accepted Suggestion still offers Undo.     |
+| `agent.css`      | The agent's motion: the shimmer, the dots, messages arriving.     |
+
+An Edit is one change a Suggestion makes: set a prop, or insert, remove or
+move a Block.
+
+## One agent turn
+
+`session.ts` makes a fresh set of tools for each ask, with the Block as
+`focus` and the ask's id as `meta`:
+
+```ts
+const tools = agentTools(editor, { focus: blockId, meta: { ask: id } });
+```
+
+It calls `read_email`, hands the result to the scripted agent, and sends what
+the agent decided to `suggest`. A model would make the same two calls. The
+`suggest` result names the Suggestion, and the chat keeps that id.
+
+The chat never copies a Suggestion's status. It reads the open list from the
+editor each render, so streaming, open and stale always match the Canvas.
+
+Accept and reject events carry the ask's id in `meta`. So the chat can say
+"Accepted" or "Rejected" once the Suggestion has left the list.
+
+The session keeps every Action since the newest accept, read from
+`getLastAction()` each time the editor changes. `receipt.ts` says Undo still
+applies until one of them has a non-empty `blocks`. An Action that only moves the selection keeps Undo. An edit, a peer's change or an undo hides it.
+
+## The first draft
+
+`first-email.ts` writes each section as an insert with an id of its own. The
+Blocks inside it follow, with that id as their `parent`. Nothing counts an
+index.
+
+The prompt shows only while the email has no Blocks. `usePhase` in
+`session.ts` says which of three phases the chat is in: `empty`, `writing`
+while that Suggestion is open, or `ready`. Asks wait while it is `writing`,
+since its Blocks are not stored yet.
+
+`session.ts` starts a streaming Suggestion with no Edits, and calls `extend`
+with one section at a time. Accept stays disabled until `finish`. The editor
+refuses it before then too, so the button is a courtesy.
+
+Stop calls `finish` early. There is no other API for it. The session hears the
+`finish` event, and the next `extend` answers `finished`, so the scripted
+agent writes nothing more.
+
+`working-line.ts` turns the newest Edit into the chat's working line. It sits
+in a live region, so a screen reader reads it out.
+
+## What it draws on the Canvas
+
+`agentSlots` in `slots.tsx` takes the editor's Slots and fills two on top.
+
+The `selection` Slot draws the editor's own outline and toolbar. It adds a
+sweep while the agent reads the Block, and the prompt Ask opened.
+
+The `suggestion` Slot draws a dashed mark on each Block a Suggestion touches:
+red stripes for one it removes, grey once it is stale. It skips a Block inside
+another touched Block, so a new section is one mark rather than one per Block.
+
+Only one Suggestion gets the Accept and Reject bar at a time: the newest one on
+the selected Block, or else the newest of all. Bars for every open Suggestion
+would cover the email.
+
+Every rectangle comes from the Canvas, for Blocks that are neither selected nor
+hovered too. Nothing reads the iframe.
+
+## What it leaves out
+
+There is no saving: a reload starts over. Your product would save each
+Suggestion's `toJSON()` with its thread. On load it would restore each one with
+`editor.suggest(json.edits, json)`.
+
+There is no real model. [Add an agent to your editor](/guides/add-an-agent/)
+shows the same tools wired to Claude.

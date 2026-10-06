@@ -1,0 +1,495 @@
+---
+title: lekh/canvas
+description: "The editing surface, the palette hooks, commands and keyboard shortcuts."
+---
+
+Everything that needs a browser: the canvas people edit on, the hooks that make
+a palette draggable, and the command set behind the keyboard shortcuts.
+
+This is the only entry point besides `lekh/tiptap` marked `"use client"`. Keep
+it out of a send job and no editor reaches that bundle.
+
+:::caution[Settling]
+Slots and commands work, but expect some renaming as more products use them.
+:::
+
+![Gzipped size of lekh/canvas](https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2Fvjsolanki%2F5d00f9ab6617974fe2b6a95b643ce5b7%2Fraw%2Flekh-canvas.json)
+
+## Import
+
+```tsx
+import { Canvas, EditorProvider, useEditor } from "lekh/canvas";
+```
+
+## EditorProvider
+
+```tsx
+<EditorProvider editor={editor} editableText={text.EditableText}>
+  {children}
+</EditorProvider>
+```
+
+Marks the region of your app the editor is active in. Wrap **both** the canvas
+and the palette in it. A drag starts in one and ends in the other, and they are
+usually far apart in your layout.
+
+| Prop           | Type           | Default | What it does                                     |
+| -------------- | -------------- | ------- | ------------------------------------------------ |
+| `editor`       | `Editor`       | —       | Required. From `createEditor`.                   |
+| `editableText` | `EditableText` | none    | Leave it out and text draws but cannot be typed. |
+
+## Canvas
+
+```tsx
+<Canvas title="Email" height="100vh" />
+```
+
+Renders the email for editing, inside an isolated frame so what you see matches
+what a mail client will show.
+
+| Prop           | Type               | Default | What it does                                         |
+| -------------- | ------------------ | ------- | ---------------------------------------------------- |
+| `width`        | `number \| string` | `600`   | How wide the email renders on desktop.               |
+| `mobileWidth`  | `number \| string` | `375`   | How wide the frame gets on the mobile Stage.         |
+| `height`       | `number \| string` | —       | How tall it is on screen. Given one, it scrolls.     |
+| `zoom`         | `number`           | `1`     | How large the email is drawn. `0.8` is 80%.          |
+| `showOriginal` | `string`           | —       | A Suggestion's id. Draws the email without it.       |
+| `slots`        | `CanvasSlots`      | `{}`    | The chrome drawn over it. The library draws none.    |
+| `keymap`       | `Keymap`           | —       | Merged over the default keymap.                      |
+| `title`        | `string`           | —       | Accessible name for the frame.                       |
+| `className`    | `string`           | —       | On the canvas element — the sheet, not the scroller. |
+| `style`        | `CSSProperties`    | —       | Same. **Do not put a height here** — use `height`.   |
+
+The frame really is `mobileWidth` wide on the mobile Stage, so the email's own
+media queries fire. It is the rendering a phone would get, not an impression of
+one.
+
+`zoom` changes only the drawing. The email is still laid out at its true width,
+so its media queries fire as they will when it is sent. Every Slot gets its
+rectangle at the drawn size, so your chrome needs no maths. lekh does not decide
+what fits: measure your own room and pass a number.
+
+`showOriginal` takes the id of an open Suggestion. While it is set, the Canvas
+draws the email as though that Suggestion had never come, and leaves out its
+`suggestion` Slot. Other open Suggestions are still drawn. Nothing is saved or
+announced, and the Suggestion stays open. Set it while your users hold a
+"see original" button, and clear it when they let go.
+
+The canvas element is as tall as the email, always. Chrome is positioned against
+it, so a height in `style` clips every outline past the fold instead of
+scrolling. Pass `height`, or give an ancestor the overflow — see
+[Give the canvas a height](/guides/canvas-scrolling/).
+
+## Slots
+
+The canvas draws no chrome at all. Every outline, indicator and toolbar is a
+component you supply.
+
+| Slot                | Receives                | Drawn where                               |
+| ------------------- | ----------------------- | ----------------------------------------- |
+| `selection`         | `BlockChromeProps`      | Over the selected Block, and its actions. |
+| `boxEdges`          | `BoxEdgesProps`         | Over the selected Block's Boxes.          |
+| `hover`             | `BlockChromeProps`      | Over the Block `getHovered()` names.      |
+| `dropIndicator`     | `DropIndicatorProps`    | Where a dragged Block would land.         |
+| `dropTarget`        | `DropTargetProps`       | Every place a dragged Block may land.     |
+| `dragPreview`       | `DragPreviewProps`      | Under the pointer, while a Block moves.   |
+| `draggingBlock`     | `BlockChromeProps`      | Over the Block a drag is carrying.        |
+| `textToolbar`       | `TextToolbarProps`      | Against the current text selection.       |
+| `pendingImage`      | `PendingImageProps`     | Where an uploading image will land.       |
+| `failedImage`       | `FailedImageProps`      | Where an image that failed was going.     |
+| `unregisteredBlock` | `BlockChromeProps`      | Over a Block you have no Definition for.  |
+| `dropRefusal`       | `DropRefusalProps`      | Where a drag will not be taken.           |
+| `emptyBlock`        | `BlockChromeProps`      | Over a Block with nothing to show.        |
+| `suggestion`        | `SuggestionChromeProps` | Over every Block a Suggestion touches.    |
+| `diagnostic`        | `DiagnosticChromeProps` | Over every Block a Diagnostic names.      |
+
+Every slot is optional, and one you leave out draws nothing. The exceptions are
+`dragPreview`, `dropRefusal` and `emptyBlock`, which fall back to plain
+defaults. Each of those three looks broken when nothing draws it: a Block
+carried with no preview, a drop that quietly does nothing, and reserved space
+with nothing in it. Passing your own replaces the default entirely, and a
+component that renders `null` is how you turn one off.
+
+They all receive a `rect` already translated into the canvas's coordinate
+space, so a slot is a `position: absolute` element and four numbers, with no
+arithmetic to do.
+
+`dropIndicator`'s rectangle is flat along the parent's layout axis: zero height
+between stacked Blocks, zero width between Blocks sharing a row. `target.axis`
+says which. A `target.position` of `"inside"` means the whole container, which
+only happens when it is empty. It also receives `dragged`, the Block being
+carried: `{ type }` when one is being added, `{ type, blockId }` when one
+already in the email is moving. And it receives `parentRect`, the container
+the Block will land in. Outline it when you want your users to see which level
+a drop lands at, such as one column of several.
+
+`dropTarget` is drawn once for each place `getDropTargets` lists, from the
+moment a drag starts until it ends. It gets the same `target`, `dragged` and
+`rect` as `dropIndicator`, plus `current`, which is `true` for the place the
+pointer picks now. `dropIndicator` draws that one too, so return `null` for it
+or draw it differently. It is drawn under `dropIndicator`.
+
+While a drag is in flight, the canvas stops asking for `selection`, `hover` and
+`textToolbar`. Chrome that answers other questions competes
+with the one mark that says where the Block lands.
+
+### Box edges
+
+A Box is a Block's spacing on up to four sides, declared in its Schema (see
+[Boxes](/guides/inspector/#boxes)). When the selected Block has one, the canvas
+draws `boxEdges` over it with one edge per side:
+
+```ts
+interface BoxEdgesProps {
+  readonly block: Block;
+  readonly rect: Rect;
+  readonly edges: readonly BoxEdge[];
+}
+
+interface BoxEdge {
+  readonly box: string;
+  readonly side: "top" | "right" | "bottom" | "left";
+  /** The prop a grip on this edge writes. */
+  readonly prop: string;
+  /** The band this side's padding fills, inside any border. */
+  readonly rect: Rect;
+}
+```
+
+Each `rect` is already zoomed, like every other rectangle, and its thickness is
+the side's value at the zoom. A prop holding two sides, like a button's
+`innerPaddingY`, gives two edges with the same `prop`. A button has two Boxes,
+so its outer edge names `paddingTop` and the edge by its label names
+`innerPaddingY`.
+
+The canvas finds each Box by reading what was drawn: the first element of the
+Block whose padding matches every side's value. When two Boxes have the same
+values, the one declared first in the Schema gets the outer element, so declare
+the outer Box first. On mobile, only sides that can take a phone-only value
+have edges. A Box drawn some other way, with spacer cells say, has no edges. The edges follow a Pending Change, so a grip
+moves while you drag it.
+
+To drag a side, call `setPendingChange` as the pointer moves, then
+`commitPendingChange` on release. That is one undo step. Call
+`cancelPendingChange` on Escape. Read the Block's Control Descriptors to tell
+whether a Box is locked, and if so move all its sides at once.
+
+### Blocks with nothing to show
+
+A container with no children has no height, and neither does a Block whose
+Definition renders `null`. Left alone, both vanish: nothing to point at,
+nothing to drop into, nothing to select. The canvas gives each of them a box so
+they stay reachable, and asks `emptyBlock` to draw it.
+
+You get the same `{ block, rect }` as `selection`, and the rectangle is the
+Block's own. Most editors draw one thing for both cases, usually a dashed
+outline reading as "put something here". The `block` is there if you want to
+tell them apart, since `useEditor().getDefinition(block.type)` says whether the
+Block is a container.
+
+Unlike the chrome above, `emptyBlock` stays drawn while a drag is in flight.
+Every empty container is somewhere the Block could go, which is worth showing.
+The exception is the container the drag is landing inside, where
+`dropIndicator` is already drawing on the same rectangle.
+
+The box is canvas-only. Nothing about it reaches the markup you send.
+
+### Dragging
+
+A Block being carried does not move. The canvas draws a preview under the
+pointer and leaves the Block itself where it sits, so two slots describe a drag:
+
+`dragPreview` receives `{ block }`, where `block` is a `DraggedBlock`:
+
+```ts
+interface DraggedBlock {
+  readonly type: string;
+  /** The Block being moved. Absent when a new one is being added. */
+  readonly blockId?: string;
+}
+```
+
+Whether `blockId` is there is the difference between the two gestures a preview
+can be drawn for: absent means a Block is arriving from a palette, present
+means one already in the email is being moved. Nothing of the drag backend is
+in it. It is the Block, and where it came from.
+
+The preview renders under the pointer, **in your document**. Your stylesheet, your utility classes and your design system all
+reach it exactly as they would anywhere else. Its top-left corner sits on the
+pointer, and it has no size of its own. Move it off the pointer with your own
+CSS, so it doesn't cover the drop indicator.
+
+Its default is a small label showing the Block's type, 16px right of and 8px
+below the pointer. No preview can render the Block's real appearance, because
+that lives in the email's own stylesheet inside the frame. Trading that
+fidelity is what buys you a preview you can actually style.
+
+`draggingBlock` receives `BlockChromeProps` and is drawn over the Block where it
+still sits: a scrim, a dashed border, whatever reads as "this one is in the
+air". Nothing is drawn without it. Note it can only draw _over_ the Block, not
+fade the Block itself. The Block is inside the frame, and that is still the one
+place your CSS does not reach.
+
+A drag from a palette is untouched by either slot. It lifts your own palette
+entry, in your own markup, already wearing your own styles.
+
+The slot layer ignores pointer events. Set `pointerEvents: "auto"` on anything
+clickable, such as a toolbar.
+
+### Suggestions
+
+A Suggestion is a change your agent proposes. Your users see it on the canvas,
+then accept or reject it. It is not in the Document until they accept it.
+
+The canvas draws the Document plus every open Suggestion. It draws a Block the
+Suggestion inserts in place, and that Block takes up room. It still draws a
+Block the Suggestion removes, where it is now, until your users accept. It draws
+a Block the Suggestion moves where it would go.
+
+The canvas draws `suggestion` once for each open Suggestion, including
+streaming and stale ones. It gets:
+
+```ts
+interface SuggestionChromeProps {
+  readonly suggestion: Suggestion;
+  readonly blocks: readonly TouchedBlock[];
+}
+
+interface TouchedBlock {
+  readonly block: Block;
+  readonly rect: Rect;
+  readonly change: "insert" | "remove" | "move" | "set";
+  /** The props it sets. Empty when it sets none. */
+  readonly props: readonly string[];
+}
+```
+
+Read `suggestion.status` to pick what to show:
+
+- `streaming`: your agent is still writing it, so it can't be accepted yet.
+- `open`: ready to accept or reject.
+- `stale`: your users changed something it touches, so it can't be accepted.
+  The canvas stops drawing the Blocks it would insert, so they drop out of
+  `blocks`.
+
+Wire your accept and reject buttons to `suggestion.accept()` and
+`suggestion.reject()`.
+
+The slot is not tied to selection or hover. It stays up while your users
+select, drag and type elsewhere. If you leave it out, the canvas draws nothing
+extra over the email. Inserted Blocks still show.
+
+## Diagnostics on the email
+
+A Diagnostic is a problem the editor found in the email, from
+`editor.getDiagnostics()`. The canvas draws `diagnostic` once over each Block
+that a Diagnostic names, for a badge your users spot while they look at the
+email. It gets:
+
+```ts
+interface DiagnosticChromeProps {
+  readonly block: Block;
+  readonly rect: Rect;
+  /** Every Diagnostic naming this Block, in the editor's order. */
+  readonly diagnostics: readonly Diagnostic[];
+}
+```
+
+A Diagnostic about the whole email names no Block, so it is not drawn. Neither
+is a Block the current Stage hides. Like `suggestion`, the slot stays up through
+selection, hover and drags.
+
+## Palette hooks
+
+### usePalette
+
+```ts
+const entries: readonly PaletteEntry[] = usePalette();
+```
+
+The Blocks this editor knows about, as `{ type, label }`. Data only — you draw
+the palette.
+
+The list is what you composed minus the `structural` Definitions, root type
+included. A structural Block is part of another Block's shape and only its
+parent can make one, so an entry for it would be a button that cannot work.
+Nothing else is removed — the library never filters by taste, so filter the
+root type yourself rather than having it guess what should be offered.
+
+### usePaletteDrag
+
+```tsx
+const { dragHandleProps, isDragging } = usePaletteDrag(entry.type);
+
+<button {...dragHandleProps}>{entry.label}</button>;
+```
+
+Makes one entry draggable onto the canvas. Spread `dragHandleProps` onto
+whatever should start the drag.
+
+It carries no styling and no drag-library types, so the drag backend can change
+without breaking your palette.
+
+### useBlockDrag
+
+```ts
+const { dragHandleProps, isDragging, isRefused } = useBlockDrag(block.id);
+```
+
+Makes an element the drag handle for a Block already in the email. Spread
+`dragHandleProps` onto a grip in your `selection` Slot, or anywhere else inside
+`EditorProvider`.
+
+Once any Block has a handle, every Block moves only by its handle, and a press
+on any Block's body selects it. While no handle is registered, every Block drags
+from its body. A handle goes when its element unmounts.
+
+A drag from a handle resolves where it lands exactly as a drag from the Block
+does. A `<button>` works as a handle.
+
+`isDragging` is true while this Block is being carried. `isRefused` is true
+while that drag is over somewhere that will not take it. If a Block has two
+handles at once, the newest one is in force.
+
+A handle does nothing for a Block that cannot be dragged: the root, a
+`structural` Block such as a column, and the Block somebody is typing into.
+
+See [A grip to move the Block](/guides/chrome/#a-grip-to-move-the-block).
+
+## Commands
+
+```ts
+const commands = useCommands();
+commands.undo();
+```
+
+The command set for the surrounding `EditorProvider`'s editor. It is
+[`createCommands`](/reference/lekh/#commands) from `lekh`, made once per
+editor. See there for the eleven actions, what each returns, and the `can`
+checks that say whether one would do anything.
+
+## Keyboard shortcuts
+
+`defaultKeymap`:
+
+| Binding                | Command            |
+| ---------------------- | ------------------ |
+| `Mod+z`                | `undo`             |
+| `Mod+Shift+z`, `Mod+y` | `redo`             |
+| `Backspace`, `Delete`  | `delete`           |
+| `Mod+d`                | `duplicate`        |
+| `Mod+Shift+ArrowUp`    | `moveUp`           |
+| `Mod+Shift+ArrowDown`  | `moveDown`         |
+| `Escape`               | `stepOut`          |
+| `Enter`                | `selectFirstChild` |
+| `ArrowUp`              | `selectPrevious`   |
+| `ArrowDown`            | `selectNext`       |
+
+`stopEditing` has no key of its own. Escape runs `stepOut`, which leaves the
+text first.
+
+`Mod` is Command on Apple platforms and Control everywhere else.
+
+Your `keymap` prop is merged over this one. To free a keystroke your app
+already owns, map it to `null`:
+
+```tsx
+<Canvas keymap={{ "Mod+d": null, "Mod+Shift+d": "duplicate" }} />
+```
+
+## Text
+
+`useEditableText` returns the `EditableText` component the provider was
+given. You rarely call it. The canvas does, when you pass `editableText` to
+`EditorProvider`.
+
+A double-click puts the caret in a Block's text. Until then the text is
+something to press and drag, not something to type into. See
+[Let people type formatted text](/guides/rich-text/).
+
+**`EditableTextProps`** is what the canvas hands your `EditableText`: `blockId`,
+`value`, `editable`, `onSelectionChange` and `linkColor`. Only one is
+`editable` at a time, and it turning true is the cue to take focus. Draw links
+in `linkColor` when it is set, so they look the way the email will. It can
+change while it is mounted.
+
+Three more arrive when the Block's text holds paragraphs: `paragraphs`,
+`paragraphStyle` and `paragraphClassName`. With `paragraphs`, Return starts a
+paragraph and Shift+Return breaks the line. Draw each paragraph in
+`paragraphStyle`, with no bottom margin on the last, so the spacing matches the
+email. The style can change while it is mounted.
+
+Five more arrive when the text holds lists too: `lists`, `listStyle`,
+`listItemStyle`, `listIndent` and `direction`. Hold bullet and numbered lists,
+one level deep. Draw them the way `RichText` writes them, so the indent and
+spacing match the email.
+
+See [Lists](/guides/rich-text/#lists).
+
+The types you do use when drawing a formatting toolbar:
+
+**`TextFormatting`** is what the selection carries: `bold`, `italic`,
+`underline`, `strike`, `link`, and `list` (`"bullet"`, `"numbered"` or
+`undefined`).
+
+**`TextCommands`** is what you can do to it: `toggleBold`, `toggleItalic`,
+`toggleUnderline`, `toggleStrike`, `setLink(href)`, `toggleBulletList`,
+`toggleNumberedList`. Pass `undefined` to `setLink` to unlink. Each leaves
+focus where it was, so a button never ends the selection it acts on.
+
+The list toggles act on whole paragraphs. So in text that holds lists, the
+selection is reported for a caret too.
+
+**`TextToolbarProps`** is what the `textToolbar` slot receives: `rect`,
+`formatting`, `commands`.
+
+## useEditor
+
+```ts
+const editor = useEditor();
+```
+
+The editor from the surrounding `EditorProvider`.
+
+It does **not** re-render when things change. Use `useEditorState` for that.
+
+## useEditorState
+
+```ts
+const stage = useEditorState((editor) => editor.getStage());
+```
+
+Read one thing from the surrounding `EditorProvider`'s editor, and re-render
+when that thing changes. The whole subscription: no effect to write, nothing to
+call beside the read.
+
+Every getter on `Editor` answers with the same value until that value moves, so
+any of them can be selected. Select the narrowest thing you need — a component
+reading `canUndo()` holds still while somebody types.
+
+It wakes on hover as well, so `getHovered()` can be selected here too.
+
+Your selector must not build the value it returns. Composing two getters into a
+fresh object or array hands back a new reference every call, which React reads
+as a change that never settles. Call the hook twice instead.
+
+Selecting `getDocument()` re-renders on every keystroke by design, because a
+Block's text lives on the Block. See
+[Subscribe to changes efficiently](/guides/subscribing/).
+
+## Everything this entry point exports
+
+`Canvas` `CanvasProps` `CanvasSlots` `EditorProvider` `EditorProviderProps`
+`useEditor` `useEditorState` `usePalette` `usePaletteDrag` `PaletteEntry`
+`PaletteDrag` `useBlockDrag` `BlockDrag`
+`DragHandleProps` `useCommands`
+`defaultKeymap` `Keymap` `useEditableText` `EditableText` `EditableTextProps`
+`TextSelection` `TextFormatting` `TextCommands` `TextToolbarProps`
+`BlockChromeProps` `DropIndicatorProps` `DropTargetProps` `DragPreviewProps`
+`DraggedBlock`
+`DropRefusalProps` `PendingImageProps` `FailedImageProps`
+`SuggestionChromeProps` `TouchedBlock` `DiagnosticChromeProps` `BoxEdgesProps`
+`BoxEdge` `Rect`
+
+A test fails if any exported name stops appearing on this page, so the list is
+complete rather than representative.

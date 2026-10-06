@@ -1,0 +1,102 @@
+name: Deploy docs to staging
+
+on:
+  push:
+    branches: [main]
+  # A staging deploy is safe to trigger by hand — it never touches production.
+  workflow_dispatch:
+
+# Staging always wants the newest commit on main. If two land close together,
+# the older run has nothing to say and can be cancelled.
+concurrency:
+  group: docs-staging
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  staging:
+    name: Upload a version and alias it to staging
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      # Same ordering reason as CI: the docs site resolves `lekh` through the
+      # published types in dist/, so the library has to be built first. `pnpm
+      # build` is recursive and does both in dependency order.
+      - run: pnpm build
+
+      # `versions upload` is the half of a deploy that does not go live. It
+      # uploads the bundle and registers it as a Version, and the only thing
+      # that can reach it is the preview alias below. Production keeps serving
+      # whichever Version was last promoted, untouched.
+      #
+      # It cannot create the Worker, only add a Version to one that exists —
+      # against a missing Worker it fails with "cannot upload a new version of
+      # a Worker that does not yet exist". Bootstrapping is a one-time `wrangler
+      # deploy` run by hand. No workflow here runs `deploy` against the docs
+      # Worker, which is what keeps the promote step the only route to
+      # production.
+      - name: Upload a version
+        id: upload
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          # Wrangler mirrors the result of the upload into this file as NDJSON.
+          # Parsing it beats scraping stdout, which carries a banner and
+          # progress lines that are meant for a human.
+          WRANGLER_OUTPUT_FILE_PATH: ${{ runner.temp }}/wrangler-output.json
+          # Passed through the environment rather than interpolated into the
+          # script: a commit message is arbitrary text, and `${{ }}` would
+          # splice it into the shell before bash ever sees a quote.
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+        run: |
+          set -euo pipefail
+
+          # A Version tag is short and single-line, so take the abbreviated SHA
+          # and the subject line only. The tag is what makes a Version
+          # identifiable later, when you are choosing one to promote.
+          # head_commit is absent on a workflow_dispatch run, so fall back to
+          # the SHA rather than sending an empty message.
+          message=$(printf '%s' "${COMMIT_MESSAGE:-}" | head -n 1 | cut -c1-100)
+          pnpm exec wrangler versions upload \
+            --preview-alias staging \
+            --tag "${GITHUB_SHA::8}" \
+            --message "${message:-Manual staging run of ${GITHUB_SHA::8}}"
+
+          version_id=$(jq -rs '[.[] | select(.type == "version-upload")] | last | .version_id' \
+            "${WRANGLER_OUTPUT_FILE_PATH}")
+          alias_url=$(jq -rs '[.[] | select(.type == "version-upload")] | last | .preview_alias_url // ""' \
+            "${WRANGLER_OUTPUT_FILE_PATH}")
+
+          {
+            echo "version_id=${version_id}"
+            echo "alias_url=${alias_url}"
+          } >> "$GITHUB_OUTPUT"
+
+      # The version ID is the input to the promote workflow, so it belongs
+      # somewhere copy-pasteable rather than buried in a log.
+      - name: Summarise
+        env:
+          VERSION_ID: ${{ steps.upload.outputs.version_id }}
+          ALIAS_URL: ${{ steps.upload.outputs.alias_url }}
+        run: |
+          set -euo pipefail
+          {
+            echo "## Staging"
+            echo
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Staging URL | ${ALIAS_URL:-_preview alias unavailable_} |"
+            echo "| Version ID | \`${VERSION_ID}\` |"
+            echo "| Commit | \`${GITHUB_SHA::8}\` |"
+            echo
+            echo "Production is unchanged. To make this live, run the"
+            echo "**Promote docs to production** workflow."
+          } >> "$GITHUB_STEP_SUMMARY"

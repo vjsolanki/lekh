@@ -1,0 +1,59 @@
+---
+/**
+ * The standing warning at the top of every page: do not use this yet.
+ *
+ * Starlight's banner is set per page in frontmatter, which is the wrong shape
+ * for a fact that is true of the whole site. This renders it unconditionally
+ * instead, at the head of the reading column, so a reader meets it before the
+ * title of whatever page they landed on. A page that sets its own `banner` in
+ * frontmatter still wins — that one is about that page, this one is about the
+ * library.
+ *
+ * It is a `danger` aside rather than markup of its own, so it is drawn in red
+ * with the same spine and wash every other warning on the site uses. The wrapper
+ * is Starlight's own content panel, which is what ranges it against the prose
+ * column instead of the frame.
+ *
+ * Overrides `@astrojs/starlight/components/Banner.astro`.
+ */
+import { Aside } from "@astrojs/starlight/components";
+
+const { banner } = Astro.locals.starlightRoute.entry.data;
+---
+
+{
+  banner ? (
+    <div class="sl-banner" data-pagefind-ignore set:html={banner.content} />
+  ) : (
+    <div class="content-panel banner-panel" data-pagefind-ignore>
+      <div class="sl-container">
+        <Aside type="danger" title="Don't use this yet">
+          lekh isn't finished. The API still moves around and there's nothing to
+          install yet, so don't build anything real on it.
+        </Aside>
+      </div>
+    </div>
+  )
+}
+
+<style is:global>
+  /*
+   * Starlight's own panel geometry, restated. `.content-panel` and
+   * `.sl-container` are styled inside `ContentPanel.astro`, so the class names
+   * alone carry nothing here — without these the warning ranges against the
+   * frame instead of the column the title and prose share.
+   */
+  .banner-panel {
+    padding: 1.5rem var(--sl-content-pad-x);
+  }
+
+  .banner-panel > .sl-container {
+    max-width: var(--sl-content-width);
+  }
+
+  @media (min-width: 72rem) {
+    .banner-panel > .sl-container {
+      margin-inline: var(--sl-content-margin-inline, auto);
+    }
+  }
+</style>

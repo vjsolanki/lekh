@@ -1,0 +1,424 @@
+/*
+ * The example editor's stylesheet. Everything it describes belongs to this
+ * example, not to the library — `lekh` draws no chrome of its own.
+ *
+ * The email is the only white sheet on screen, framed by crop marks. The
+ * chrome around it is plain neutral grey. Green is kept for marks: selection,
+ * drop, override, pressed. If it is green, somebody marked it. Red and amber
+ * mean one thing only: something is wrong.
+ *
+ * Loaded by `/editor/` alone, which keeps Tailwind's preflight away from
+ * Starlight's own styles.
+ */
+
+@import "tailwindcss";
+@import "tw-animate-css";
+
+/* Dark is a class, set before first paint by the inline script in
+   `editor.astro`, so the toggle can overrule the operating system either way. */
+@custom-variant dark (&:is(.dark *));
+
+/*
+ * Three grounds, ordered by depth: `background` is the raised chrome, `rail`
+ * sits level, `bench` is the sunk surface the email sits on. The email itself
+ * is always white.
+ */
+:root {
+  color-scheme: light;
+
+  --radius: 0.3125rem;
+
+  --background: #ffffff;
+  --foreground: #141613;
+  --card: #ffffff;
+  --card-foreground: #141613;
+  --popover: #ffffff;
+  --popover-foreground: #141613;
+
+  /* Kept for marks: selection, drop, override, pressed. */
+  --primary: #2ea44f;
+  --primary-foreground: #ffffff;
+  --ring: #2ea44f;
+  --wash: #e7f5ea;
+  /* The green for small text, darker so it reads. Fills, rings and icons keep
+     `--primary`. */
+  --ink-mark: #18803a;
+
+  --secondary: #eef0ec;
+  --secondary-foreground: #393d36;
+  --accent: #eef0ec;
+  --accent-foreground: #141613;
+  --muted: #f6f7f4;
+  --muted-foreground: #676c63;
+
+  --border: #e6e8e3;
+  --input: #e6e8e3;
+
+  /* Red, far from the green, so a refusal never reads as a mark. */
+  --destructive: #b42318;
+
+  --ink-2: #393d36;
+  --rail: #f6f7f4;
+  --bench: #eceee9;
+  --rule-soft: #eef0ec;
+  --crop: #8d9389;
+  --warn: #b45309;
+  --warn-wash: #fef3e2;
+  --error-wash: #fdecea;
+  --ok: #18803a;
+
+  /*
+   * The floating toolbars over the email: the Block toolbar and the agent's
+   * DecisionBar. Dark in both themes, so they are not set again under `.dark`:
+   * they sit over the email, which is white in both themes.
+   */
+  --toolbar: #141613;
+  --toolbar-foreground: #f1f2ee;
+  --toolbar-ink: #dcdfd8;
+  --toolbar-mark: #86efac;
+  /* A rim against a dark photograph, a highlight along the top, a cast shadow. */
+  --shadow-toolbar:
+    0 0 0 1px rgb(0 0 0 / 12%), inset 0 1px 0 rgb(255 255 255 / 10%),
+    0 8px 24px -6px rgb(0 0 0 / 50%);
+
+  /* The email: a crisp rim and one soft cast shadow. Nothing more. */
+  --shadow-sheet:
+    0 0 0 1px rgb(20 22 19 / 8%), 0 1px 2px rgb(20 22 19 / 6%),
+    0 18px 40px -18px rgb(20 22 19 / 28%);
+
+  /* The lip of the bench: the chrome around it casts down. */
+  --shadow-well:
+    inset 0 1px 0 rgb(20 22 19 / 7%),
+    inset 0 10px 20px -14px rgb(20 22 19 / 45%);
+
+  /* One curve. Fast to leave, slow to arrive. */
+  --ease: cubic-bezier(0.2, 0, 0, 1);
+
+  /*
+   * Four durations, and nothing else.
+   * 100: something following the pointer or a value changing colour.
+   * 140: a toolbar rising to its Block.
+   * 150: a landing — a dropped Block, a wash, a message arriving.
+   * 200: a panel arriving or the Stage changing width.
+   * The selection mark's 120ms glide is the one exception, in `travels`.
+   */
+  --duration-quick: 100ms;
+  --duration-toolbar: 140ms;
+  --duration-land: 150ms;
+  --duration-panel: 200ms;
+}
+
+.dark {
+  color-scheme: dark;
+
+  --background: #0e100d;
+  --foreground: #ecefe9;
+  --card: #181b16;
+  --card-foreground: #ecefe9;
+  --popover: #181b16;
+  --popover-foreground: #ecefe9;
+
+  --primary: #3fb862;
+  --primary-foreground: #08160c;
+  --ring: #3fb862;
+  --wash: #13301c;
+  /* Lighter than the fill's green: thin strokes on a dark ground need it. */
+  --ink-mark: #6fd68b;
+
+  --secondary: #1f231d;
+  --secondary-foreground: #c3c8bf;
+  --accent: #1f231d;
+  --accent-foreground: #ecefe9;
+  --muted: #0b0d0a;
+  --muted-foreground: #8d9389;
+
+  --border: #262a24;
+  --input: #262a24;
+
+  --destructive: #ff8a80;
+
+  --ink-2: #c3c8bf;
+  --rail: #141712;
+  --bench: #090b08;
+  --rule-soft: #1e221c;
+  --crop: #6b7167;
+  --warn: #f0b44a;
+  --warn-wash: #2c220f;
+  --error-wash: #2f1614;
+  --ok: #6fd68b;
+
+  --shadow-sheet:
+    0 0 0 1px rgb(255 255 255 / 9%), 0 20px 44px -18px rgb(0 0 0 / 75%);
+
+  --shadow-well:
+    inset 0 1px 0 rgb(0 0 0 / 55%), inset 0 10px 20px -14px rgb(0 0 0 / 85%);
+}
+
+@theme inline {
+  /*
+   * Geist, both voices. The sans sets everything that is words, names
+   * included. The mono, with tabular figures, sets only a value you can type
+   * or measure: 24px, #1a1a1a, 50%.
+   */
+  --font-sans:
+    "Geist Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica,
+    Arial, sans-serif;
+  --font-mono:
+    "Geist Mono Variable", ui-monospace, SFMono-Regular, Menlo, Consolas,
+    monospace;
+
+  /* Every shadcn control sizes off `text-sm`, and a three-pane editor runs a
+     notch tighter than the 14px a marketing page wants. */
+  --text-sm: 0.8125rem;
+  --text-sm--line-height: 1.4;
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-ink-2: var(--ink-2);
+  --color-ink-mark: var(--ink-mark);
+  --color-rail: var(--rail);
+  --color-bench: var(--bench);
+  --color-rule-soft: var(--rule-soft);
+  --color-crop: var(--crop);
+  --color-wash: var(--wash);
+  --color-warn: var(--warn);
+  --color-warn-wash: var(--warn-wash);
+  --color-error-wash: var(--error-wash);
+  --color-ok: var(--ok);
+  --color-toolbar: var(--toolbar);
+  --color-toolbar-foreground: var(--toolbar-foreground);
+  --color-toolbar-ink: var(--toolbar-ink);
+  --color-toolbar-mark: var(--toolbar-mark);
+  --shadow-toolbar: var(--shadow-toolbar);
+
+  --radius-sm: calc(var(--radius) - 2px);
+  --radius-md: var(--radius);
+  --radius-lg: calc(var(--radius) + 2px);
+  --radius-xl: calc(var(--radius) + 6px);
+
+  --ease-bench: var(--ease);
+
+  /* So `transition-colors` and friends use the one curve too. */
+  --default-transition-timing-function: var(--ease);
+  --default-transition-duration: var(--duration-land);
+}
+
+@layer base {
+  *,
+  ::after,
+  ::before {
+    border-color: var(--border);
+    /* What tw-animate-css and the `transition-*` utilities fall back to. An
+       `ease-*` class still wins. */
+    --tw-ease: var(--ease);
+  }
+
+  html,
+  body {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    overflow: hidden;
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    font-size: 0.8125rem;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /*
+   * The editor is one element and it takes the window.
+   *
+   * Named rather than `body > *`, because Radix hangs a popover's positioning
+   * wrapper off the body as well, and the placement is computed from that
+   * wrapper's measured size. Give it the window's height and it is placed as
+   * something a window tall: a popover asked to open upwards off the status bar
+   * gets put a window above the button, which is the top of the screen.
+   *
+   * The island itself is `display: contents`, so the height that counts is the
+   * one on the editor inside it.
+   */
+  body > astro-island,
+  body > astro-island > * {
+    height: 100%;
+  }
+
+  /* Every number here is a measurement, and one that changes should not reflow
+     the label beside it. */
+  input[type="number"] {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* A keycap. The shortcuts popover is the only place one appears. */
+@utility keycap {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.375rem;
+  padding: 0.0625rem 0.3125rem;
+  border: 1px solid var(--border);
+  border-bottom-width: 2px;
+  border-radius: 4px;
+  background: var(--card);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  line-height: 1.3;
+  color: var(--ink-2);
+}
+
+/*
+ * The bench. Flat on purpose — the email is the only thing on screen with any
+ * texture, and a patterned ground competes with the thing it is holding. The
+ * inset shadow is the lip, which is the difference between a recess and a
+ * differently coloured rectangle.
+ */
+@utility bench-well {
+  background-color: var(--bench);
+  box-shadow: var(--shadow-well);
+}
+
+/*
+ * One corner of the trim. Which two edges get a hairline is set per corner at
+ * the call site, so this only has to say how long an arm is and what colour.
+ */
+@utility crop-mark {
+  position: absolute;
+  width: 0.6875rem;
+  height: 0.6875rem;
+  border-style: solid;
+  border-width: 0;
+  border-color: var(--crop);
+}
+
+/* The chequerboard every graphics application uses for nothing at all. */
+@utility checkerboard {
+  background-image: conic-gradient(
+    var(--rule-soft) 0deg 90deg,
+    var(--card) 90deg 180deg,
+    var(--rule-soft) 180deg 270deg,
+    var(--card) 270deg 360deg
+  );
+  background-size: 10px 10px;
+}
+
+/*
+ * The native colour picker, hidden over the well that stands in for it.
+ * `<input type="color">` takes hex and nothing else, so a surface carrying no
+ * colour would reach it as an invalid value and show black.
+ */
+@utility color-well-input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  padding: 0;
+  border: none;
+  opacity: 0;
+  cursor: pointer;
+}
+
+/* The email is on paper, whichever theme the editor is wearing. */
+@utility canvas-sheet {
+  background: #ffffff;
+  box-shadow: var(--shadow-sheet);
+}
+
+/* How a panel arrives. */
+@utility panel-in {
+  animation: panel-in var(--duration-land) var(--ease) both;
+}
+
+@keyframes panel-in {
+  from {
+    opacity: 0;
+    transform: translateY(-0.25rem);
+  }
+}
+
+@utility rail-in-left {
+  animation: rail-in-left var(--duration-panel) var(--ease) both;
+}
+
+@keyframes rail-in-left {
+  from {
+    opacity: 0;
+    transform: translateX(-0.5rem);
+  }
+}
+
+@utility rail-in-right {
+  animation: rail-in-right var(--duration-panel) var(--ease) both;
+}
+
+@keyframes rail-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(0.5rem);
+  }
+}
+
+/* A toolbar rises to meet the Block rather than being switched on. */
+@utility toolbar-in {
+  animation: toolbar-in var(--duration-toolbar) var(--ease) both;
+}
+
+@keyframes toolbar-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.25rem) scale(0.97);
+  }
+}
+
+/*
+ * The travelling marker.
+ *
+ * The library re-renders the selection Slot and the hover Slot in place rather
+ * than keyed by Block, so the element survives a change of selection and these
+ * four properties can be animated: one mark walking the page instead of a new
+ * box appearing at each stop.
+ *
+ * `data-travelling` is set only for a move the pointer made — see `useTravel`
+ * in `chrome.tsx`. Keys, Layers and undo jump. Left on, the mark would ease its
+ * way after every scroll.
+ *
+ * 120ms, short of the toolbar's 140, so the eye follows it without waiting.
+ */
+@utility travels {
+  &[data-travelling="true"] {
+    transition:
+      top 120ms var(--ease),
+      left 120ms var(--ease),
+      width 120ms var(--ease),
+      height 120ms var(--ease);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 1ms !important;
+    animation-duration: 1ms !important;
+  }
+}

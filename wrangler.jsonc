@@ -1,0 +1,13 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "lekh-docs",
+  "compatibility_date": "2026-08-13",
+  // The docs site is fully static: `pnpm build` writes it here, and the Worker
+  // does nothing but serve those files. No `main` entry point, so no script
+  // runs on a request.
+  "assets": {
+    "directory": "./apps/docs/dist",
+    // Astro emits a 404.html; serve it rather than a bare Cloudflare error.
+    "not_found_handling": "404-page",
+  },
+}

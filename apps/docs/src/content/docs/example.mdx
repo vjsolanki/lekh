@@ -1,0 +1,227 @@
+---
+title: How the example is assembled
+description: "A complete drag-and-drop email editor built from the library's parts, and the handful of files it takes."
+---
+
+import { LinkCard } from "@astrojs/starlight/components";
+
+<LinkCard
+  title="Open the example editor"
+  description="A whole editor, full screen, running in your browser against the real library."
+  href="/editor/"
+/>
+
+The palette, the outline, the inspector, the top bar, every outline and toolbar
+drawn over the email, and the dialog that answers the image hook are all
+ordinary application code. `lekh` supplies the Document, the editing mechanics,
+the drag geometry and the path to markup. It draws none of it.
+
+The editor opens on a release-notes email that uses every Block both shipped
+Presets define: `section`, `columns`, `column`, `heading`, `text`, `image`,
+`button` and `divider` from the built-in Preset, and `unsubscribe` and
+`postal-address` from the compliance one. The root `email` Block is there too.
+It is what the inspector describes when nothing is selected.
+
+`column` is the one that never appears in the palette, because it is part of the
+row's shape instead of something to drag. The row makes its own: drop
+**Columns** and two arrive together, splitting the row in half. Clicking a
+column selects the row. The row's panel is where each column's width,
+background, padding and border live, along with **Add column** and a delete for
+each one.
+
+## Things to try
+
+- **Drag a Block in.** Take one from Add on the left and drop it on the email. The
+  indicator between two Blocks is a slot you fill, and the geometry behind it is
+  the library's. Drag past the bottom edge and the canvas scrolls itself.
+- **Type.** Click into a heading or a paragraph. The formatting toolbar appears
+  against your selection, already translated out of the iframe.
+- **Press ⌘Z.** Type a few words, drag a Block, then undo. You get the drag
+  back instead of losing a character, because history is one timeline.
+- **Switch to Mobile.** The frame really narrows to 375px, so the email's own
+  media queries fire. Three things happen because the Document says they should:
+  the two feature columns stack, the spotlight row puts its image first, and the
+  strip of links disappears entirely.
+- **Select the headline on the Mobile Stage.** Only font size and alignment are
+  offered, because those are the props whose Schema opted in. Change the font
+  size and switch back to Desktop: the desktop value is untouched, and marked as
+  differing on mobile with a Revert beside it. Both are ordinary undo entries.
+- **Open the status bar's warnings.** The email ships with two, both of them
+  mistakes real email makes every week. The lead image has no alt text, and the
+  small print is a pixel under the readable minimum. Clicking one selects the
+  Block and scrolls it into view.
+- **Delete the unsubscribe link.** You cannot. It is a Required Block, so the
+  toolbar offers a padlock instead. Delete the whole footer Section and you can,
+  and the Document becomes invalid and says so, with a one-click repair.
+- **Drop an image file** from your desktop anywhere on the email, or paste a
+  screenshot. Both raise the same request the palette's Image Block does, with
+  the reason and the files attached.
+- **Cancel an upload** from the placeholder. Nothing enters the Document, and
+  there is no undo entry to step over afterwards.
+- **Turn on “Demo: fail the upload”** in the gallery, then use the retry the failure
+  offers.
+- **Open HTML** while an image is still uploading. The Document is
+  persistable at every moment, and never carries a local `blob:` URL.
+- **Make room.** Drag the edge of either side panel, or the line between Add
+  and Layers. Focus an edge and the arrow keys move it. Double-click it to put
+  it back. The sizes are remembered. Press `⇧\` to hide both sides, and again to
+  bring them back. Below 1280px wide, the left panel floats over the email and
+  goes away when you click the email.
+- **Ask the agent.** Click a Block and press **Ask** on its toolbar, or type
+  in the Agent tab beside the Inspector. The answer shows on the email as a change you accept or reject.
+  The agent lives in its own folder and plugs into the editor. See
+  [the agent chat](/example/agent/).
+- **Preview and Export.** Preview opens the email's HTML in a new tab, exactly
+  as it would be sent. Export downloads the HTML or the Document's JSON.
+- **Watch the size.** The status bar shows how big the HTML is against Gmail's
+  clip, which hides anything past roughly 102 KB. It turns amber when the email
+  gets close. `clipCheck` from [`lekh`](/reference/render/#clipcheck)
+  does the counting.
+- **Look at it in dark mode.** The **Dark** menu shows the email under no
+  change, partial invert or full invert, or all three side by side. The sample's
+  logo has dark text on a transparent background, so the strip warns it may
+  vanish. This example builds it all from the rendered HTML as an approximation,
+  and stores nothing.
+
+## Where your Save and Send test go
+
+The top bar has no Save and no Send test, because this example has no server
+behind either. Your product puts them on the right of the top bar, before
+Preview.
+
+- **Save.** Subscribe to the editor and store `getDocument()`, or store each
+  change as it happens. See
+  [Save and load a document](/guides/save-and-load/#saving-as-somebody-works).
+- **Send test.** Send the Document to your server. Render it there with
+  `renderDocument` from `lekh`, run `clipCheck` on the final HTML, and hand it to your email
+  provider. See [Render an email on a server](/guides/server-rendering/).
+
+The email's name in the top bar is yours too. It is not part of the Document,
+so keep it wherever you keep your emails.
+
+## What it costs
+
+This is the figure worth having before you start. Everything below sits under
+`src/components/editor/`, and every line of it is application code that the
+library does not write for you.
+
+Around four and a half thousand lines of TypeScript, plus a few hundred lines of
+CSS and eighteen shadcn/ui primitives. Largest first:
+
+| File                  | What it does                                                                                    |
+| --------------------- | ----------------------------------------------------------------------------------------------- |
+| `inspector.tsx`       | [One `switch` over `kind`](/example/inspector/), plus mobile overrides and structural children. |
+| `EmailEditor.tsx`     | Composes everything, lays out the top bar, rails, bench and status bar, and takes an agent.     |
+| `chrome.tsx`          | [Eleven Canvas Slots](/example/chrome/): outlines, indicator, toolbars, image placeholders.     |
+| `motion.ts`           | [The slide after a drop and the washes](/example/chrome/#motion-that-says-where-things-went).   |
+| `sample.ts`           | The two Presets, two Validators, and the Document it opens on.                                  |
+| `gallery.tsx`         | [The answer to `resolveImage`](/example/gallery/), with progress, cancellation and failure.     |
+| `command-palette.tsx` | The ⌘K palette: every Command (undo, delete, move), greyed when it can't run, and agent asks.   |
+| `outline.tsx`         | [The tree](/example/outline/), walked from `getDocument()`.                                     |
+| `layout.ts`           | Which panels are open, what floats on a small screen, and what `⇧\` puts back.                  |
+| `panels.tsx`          | The resize grip, and the panel sizes it remembers.                                              |
+| `parts.tsx`           | Shared layout pieces.                                                                           |
+| `dark-preview.tsx`    | The Dark menu and strip. `dark.ts` holds the colour flips and the vanishing-logo guess.         |
+| `suggestion-card.tsx` | The Suggestion card at the top of the Inspector, its diff rows, and hold-to-see-original.       |
+| `theme.tsx`           | Light and dark.                                                                                 |
+| `palette.tsx`         | [`usePalette` and `usePaletteDrag`](/example/palette/), grouped.                                |
+| `icons.tsx`           | Icons.                                                                                          |
+| `stock.ts`            | Sample images.                                                                                  |
+
+The first two are close to half of it between them. Read that as a
+specification rather than a warning. It is what "headless" costs and what it
+buys: not one of those lines contains a compromise with somebody else's design
+system, and none of them are fighting a component that half-fits.
+
+It is also not a floor. A product with four Block types and no mobile Stage
+writes a fraction of it — most of the inspector's bulk is one control per
+`kind`, and you only write the kinds you use.
+
+The five pages below take the parts worth reading in their own right.
+
+### Composing the Presets
+
+Two entry points, composed into one array of Block Definitions. A product
+sending password resets never composes the second one in, because a
+transactional email must not carry an unsubscribe link.
+
+```ts
+const definitions = [
+  ...createReactEmailPreset({ fontFamily, contentWidth: 600 }),
+  ...createCompliancePreset({
+    fontFamily,
+    // Whatever your provider substitutes per recipient. No default, because a
+    // default would be a guess at somebody else's substitution syntax.
+    unsubscribeUrl: "%%unsubscribe_url%%",
+    postalAddress: "Lekh Labs Ltd\n14 Wharf Road\nBristol BS1 4RN",
+  }),
+];
+```
+
+### Building the editor
+
+Built once, and never handed back through React state:
+
+```ts
+const editor = createEditor({
+  definitions,
+  rootType: REACT_EMAIL_ROOT_TYPE,
+  document: STARTING_DOCUMENT,
+  validators: [
+    minimumFontSize({ minimum: 12 }),
+    minimumContrast(),
+    workingLinks(),
+  ],
+  textEngine: engine,
+  resolveImage: gallery.resolveImage,
+});
+```
+
+Components subscribe once and read what they need during render. They never
+receive a new Document on every keystroke.
+
+### The image hook
+
+One hook covers all four routes an image arrives by: dropped from the palette,
+dragged in from the desktop, pasted, or replacing one already placed. The
+request says which, and carries whatever files came with the gesture:
+
+```ts
+const resolveImage: ImageResolver = async (request) => {
+  // request.reason  — "insert" | "add" | "replace" | "drop" | "paste"
+  // request.files   — what your user supplied, empty for a palette drop
+  // request.signal  — aborted when they cancel, or the place goes
+  request.onProgress(0.5);
+  return { src: await upload(request.files[0]), width: 1200, height: 800 };
+};
+```
+
+Return an Asset to place it, `undefined` to say they cancelled, or reject to
+fail, which offers them a retry. Nothing enters the Document until an Asset
+resolves, so the outstanding upload is chrome: the `pendingImage` and
+`failedImage` slots.
+
+This example inlines the chosen image as a data URL so the page works offline.
+A real product would upload to its own storage, or open its digital asset
+manager and return a location that already exists. The library never assumes a
+file means an upload.
+
+### Bringing a Block into view
+
+`reveal` announces that a Block should be brought on screen, and the canvas
+answers it. There is no code for this in the example — clicking a Diagnostic or
+an outline row scrolls to the Block because the canvas measured it and knows
+which element holds the overflow.
+
+```ts
+editor.reveal(blockId); // the canvas scrolls it into view
+```
+
+The example gives its own well the overflow rather than passing `height`,
+because the email sits on a paper sheet inside a grey bench with crop marks
+around it — things that have to be in the scrolling region with it. The canvas
+finds that well by walking up from itself. See
+[Give the canvas a height](/guides/canvas-scrolling/) for the two arrangements.
+
+`onReveal` is still there if you want to know a reveal happened — to
+flash a highlight, or to move focus. It is not what makes the scrolling work.

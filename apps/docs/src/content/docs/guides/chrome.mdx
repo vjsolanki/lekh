@@ -1,0 +1,179 @@
+---
+title: Draw the chrome
+description: "Outlines, toolbars, and the marks over Blocks the canvas cannot draw for you."
+---
+
+import { Code } from "@astrojs/starlight/components";
+import chrome from "../../../examples/chrome-always-on.tsx?raw";
+import grip from "../../../examples/chrome-grip.tsx?raw";
+
+## What you'll do
+
+Draw the marks that sit over the canvas when nothing is happening: what is
+selected, what is under the pointer, what the selected Block can do, and the
+two kinds of Block that have nothing to show.
+
+## The short version
+
+A Slot is a component you supply and the canvas positions. It hands you a
+rectangle in the canvas's own coordinates and the Block that rectangle belongs
+to. You draw.
+
+<Code code={chrome} lang="tsx" title="chrome.tsx" />
+
+```tsx
+<Canvas slots={slots} />
+```
+
+The library draws none of this. A Slot you leave out simply draws nothing,
+which is worth knowing before you watch it happen: an editor with no Slots at
+all still drags, still selects and still types, and shows you none of it.
+
+## The thirteen Slots, and where each one is covered
+
+Four of them are the subject of this page. The other nine exist as part of
+some other job, and are covered by the guide for that job — you meet them at
+the point you need them rather than in a list.
+
+| Slot                | Receives                | Covered in                                                    |
+| ------------------- | ----------------------- | ------------------------------------------------------------- |
+| `selection`         | `BlockChromeProps`      | This page.                                                    |
+| `hover`             | `BlockChromeProps`      | This page.                                                    |
+| `emptyBlock`        | `BlockChromeProps`      | This page.                                                    |
+| `unregisteredBlock` | `BlockChromeProps`      | This page.                                                    |
+| `dropIndicator`     | `DropIndicatorProps`    | [Build a palette](/guides/palette/)                           |
+| `dropTarget`        | `DropTargetProps`       | [Build a palette](/guides/palette/)                           |
+| `dragPreview`       | `DragPreviewProps`      | [Build a palette](/guides/palette/)                           |
+| `draggingBlock`     | `BlockChromeProps`      | [Build a palette](/guides/palette/)                           |
+| `dropRefusal`       | `DropRefusalProps`      | [Control what can go where](/guides/nesting/)                 |
+| `textToolbar`       | `TextToolbarProps`      | [Let people type formatted text](/guides/rich-text/)          |
+| `pendingImage`      | `PendingImageProps`     | [Handle images and uploads](/guides/images/)                  |
+| `failedImage`       | `FailedImageProps`      | [Handle images and uploads](/guides/images/)                  |
+| `suggestion`        | `SuggestionChromeProps` | [The `lekh/canvas` reference](/reference/canvas/#suggestions) |
+| `boxEdges`          | `BoxEdgesProps`         | [Inspector controls](/guides/inspector/#boxes)                |
+
+Every field list is in [the `lekh/canvas`
+reference](/reference/canvas/#slots). `BlockChromeProps` — the type five of
+these share — is two fields, `block` and `rect`, and nothing else.
+
+## Two things that will cost you an hour
+
+**The slot layer ignores pointer events.** That is what stops an outline
+swallowing a click meant for the email underneath it. Chrome that _is_ meant to
+be clicked has to opt back in:
+
+```tsx
+pointerEvents: "auto";
+```
+
+A toolbar that renders correctly and does nothing when clicked is almost always
+this.
+
+**Your CSS stops at the iframe.** The email renders inside one, so the email's
+own styles apply in there and yours do not. Slots are drawn outside it, in your
+document, with your design tokens and your component library.
+
+Two consequences follow, and neither has a workaround:
+
+You draw _over_ a Block, never on it. A scrim over the Block being dragged is
+possible; fading the Block itself is not.
+
+Nothing you draw reaches the email. None of the chrome on this page appears in
+the HTML you send. That is the point — it is the editor, not the message.
+
+## Marks stand down during a drag
+
+While a Block is in the air, the canvas stops asking for `selection`, `hover`
+and `textToolbar`. They come back the moment the drag ends.
+
+An outline around the Block being carried and a toolbar over the position it is
+leaving both compete with the one mark that matters, which is where the Block
+lands. This is not configurable, and you do not have to handle it — your
+components are simply not called.
+
+`emptyBlock` is the exception, and stays drawn. Every empty container is
+somewhere the Block could go, which during a drag is the most useful thing on
+screen. The one it stands down on is the container the drag is landing inside,
+where `dropIndicator` is already drawing on the identical rectangle.
+
+## A grip to move the Block
+
+By default a Block drags from anywhere on it. To move it by a grip instead,
+draw one in the `selection` Slot and spread `useBlockDrag`'s props onto it:
+
+<Code code={grip} lang="tsx" title="grip.tsx" />
+
+Drawing the grip is the whole opt-in, and it covers every Block. Once any Block
+has a grip, a press on any Block's body selects it and starts no drag. If you
+draw no grip at all, every Block drags from its body as before.
+
+The grip goes when its element unmounts. A grip in `selection` is gone while
+nothing is selected, and then every Block drags from its body again. To keep
+Blocks grip-only then too, draw a grip in `hover` as well.
+
+A drag from a grip lands exactly where a drag from the Block would. A `<button>`
+works as a grip, so it can take focus and has a name for a screen reader.
+
+`useBlockDrag` also returns `isDragging` and `isRefused`. Your `selection` Slot
+never sees them turn true, because it stands down during a drag. They are for
+a grip drawn somewhere that stays on screen, such as a row in a layers panel.
+
+## Blocks with nothing to show
+
+Two Slots are about a Block the canvas cannot render properly. Both are easy to
+forget, because neither shows up until a real Document does.
+
+`emptyBlock` covers two states wearing one face: a container with no children,
+and a Block whose Definition rendered nothing at all. Neither has any height,
+so left alone both vanish — nothing to point at, nothing to drop into, nothing
+to select. The canvas gives each one a box so it stays reachable, and asks this
+Slot to draw it.
+
+It has a default, because reserved space with nothing in it reads as a layout
+bug rather than as an invitation. Most editors draw one thing for both cases.
+If you want to tell them apart, `useEditor().getDefinition(block.type)` says
+whether the Block is a container.
+
+`unregisteredBlock` is drawn over a Block whose type this editor has no
+Definition for. It has **no** default, so without it such a Block is just a
+gap. You will meet it the first time a saved Document outlives the build that
+wrote it. See [Migrate saved documents](/guides/migrations/) for the other half
+of that problem.
+
+## Common problems
+
+**Your toolbar renders but clicking does nothing.** It needs
+`pointerEvents: "auto"`. The slot layer does not take the pointer.
+
+**An outline is in the wrong place, or drifts as you scroll.** You are adding
+the canvas's offset yourself. Don't — `rect` is already translated.
+
+**Nothing is drawn when you select a Block.** No `selection` Slot. The library
+ships no default for it, and the selection still happened.
+
+**Your chrome disappears whenever a drag starts.** Working as intended. See
+above.
+
+**Your grip does nothing.** It needs `pointerEvents: "auto"`, like any chrome
+meant to be pressed. A grip for a column, or for the Block somebody is typing
+into, also does nothing: neither can be dragged.
+
+**Pressing a Block drags it even though you drew a grip.** The grip is drawn in
+`selection`, and nothing was selected yet, so no grip was on screen. Draw one in
+`hover` as well.
+
+**A Block in a loaded Document is invisible.** Its type has no Definition, and
+you have no `unregisteredBlock` Slot to say so.
+
+**Empty columns show a dashed box you did not write.** That is `emptyBlock`'s
+default. Pass your own to replace it, or a component returning `null` to turn
+it off.
+
+## Why it works this way
+
+Chrome is the part of an editor that most obviously belongs to your product.
+Outlines, toolbars and placeholders carry your design system, and a library
+that drew them would be handing you something to override rather than something
+to use.
+
+Read [Headless by design](/why/headless/).

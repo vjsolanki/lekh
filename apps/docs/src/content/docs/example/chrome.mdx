@@ -1,0 +1,133 @@
+---
+title: "The example: the canvas chrome"
+description: "Everything drawn over the email, and the one boundary your CSS does not cross."
+---
+
+`src/components/editor/chrome.tsx`, exporting one `CanvasSlots` object.
+
+## What the library gave it
+
+A Slot is a component you supply and the canvas positions. It hands you a
+rectangle and the Block it concerns; you draw.
+
+The example fills eleven of the thirteen:
+
+```ts
+export const SLOTS: CanvasSlots = {
+  selection: Selection,
+  boxEdges: BoxGrips,
+  hover: HoverOutline,
+  dropIndicator: DropIndicator,
+  dropTarget: DropTargetMark,
+  dragPreview: DragPreview,
+  draggingBlock: DraggingBlock,
+  textToolbar: TextToolbar,
+  pendingImage: PendingImage,
+  failedImage: FailedImage,
+  unregisteredBlock: UnregisteredBlock,
+  emptyBlock: EmptyBlock,
+};
+```
+
+It leaves `suggestion` to the agent folder, and `dropRefusal` unfilled, which falls back to a plain default. Filling
+it is what [Control what can go where](/guides/nesting/) is about.
+
+## The boundary that explains the file
+
+The email renders inside an iframe. That is not an implementation detail you
+can ignore — it is the reason this file exists at all.
+
+Inside the frame, the email's own styles apply and yours do not. A mail client
+is a hostile stylesheet environment, and rendering the email in one is what
+makes the phone preview real rather than a simulation.
+
+So everything you want to style lives _outside_ the frame, in a layer over the
+top. Slots are drawn in your document, with your CSS, your design tokens and
+your component library. The canvas tells each one where its Block is.
+
+Two consequences worth internalising:
+
+**You draw over a Block, never on it.** `draggingBlock` puts a scrim over the
+Block being carried. It cannot fade the Block itself, because the Block is
+inside the frame.
+
+**The drag preview cannot show the Block's real appearance.** Its default is a
+dashed outline naming the type. A 200-word text Block previews as a
+Block-sized outline, not as the paragraph. Trading that fidelity is what buys
+you a preview you can actually style.
+
+## What had to be written
+
+**Positioning helpers.** The canvas gives you a `Rect`. Turning that into an
+absolutely positioned box is four lines, repeated across ten components, so
+the file factors it into one `box(rect)`.
+
+**The selected Block's outline and actions, in one component.** `selection`
+gets the Block and its rectangle. The example draws an outline with the Block's
+name on its top-left corner, and a toolbar on its top-right.
+
+What goes in the toolbar is your product's decision. Here it is a grip to drag
+the Block by, move up, move down, duplicate, and delete, with a padlock when
+`deletable` is `false`.
+
+The grip is a button with `useBlockDrag`'s props spread on it. Because it is
+drawn, every Block moves only by its grip. A press on any Block's body selects
+it and nothing more, so a click never reorders the email.
+
+The grip is left out for a column, which belongs to its row, and for the Block
+being typed into.
+
+The tag on the hovered Block is registered as its handle too, though it is not
+drawn as a grip. Without it, nothing is registered before the first selection,
+so a press that slipped would drag. A pointer is over a Block before it presses
+one, so the rule is in force by then.
+
+The toolbar comes after the outline in the markup, so it paints on top. On a
+narrow Block where the two would meet, the toolbar wins.
+
+**A focus ring apart from the selection.** The drag marks every Block in the
+frame as a button, so Tab can rest on a Block that is not selected. The example
+gives the focused Block a green ring with a gap round it, unlike the
+selection's line on the edge.
+
+The ring is a style the example writes into the frame, in
+`src/components/editor/focus-ring.ts`.
+
+**The image placeholders.** `pendingImage` and `failedImage` are chrome, not
+content, because nothing is in the Document until an Asset resolves. The
+example draws a progress bar for one and a retry for the other.
+
+## Motion that says where things went
+
+The example moves things only to show where they went. It reads
+`editor.getLastAction()` to know what just happened. `via` says how it came
+about, and `blocks` and `inserted` say which Blocks it touched.
+
+- The selection outline glides for 120ms when a click moved it. A key, a
+  Layers row or an undo moves it at once, so keyboard work never waits.
+- The hover outline never glides. A mark easing after the pointer is a mark
+  behind it.
+- After a drop, the Blocks it pushed aside slide from where they were, all
+  together, over 150ms. The new Block gets a short green wash.
+- After undo or redo, the Blocks it changed get a short wash.
+- The Inspector fades in when it opens, then swaps values in place when you
+  pick another Block.
+
+The slide and the washes are in `src/components/editor/motion.ts`. They and
+the focus ring are the only places the example reaches into the frame. The
+slide animates the Blocks' own elements, and a wash is a layer laid over a
+Block, so neither changes how the email looks once it settles.
+
+Every animation uses one curve, `--ease` in `editor.css`, and four durations:
+100, 140, 150 and 200ms. The selection's 120ms glide is the one exception. With reduced motion on, nothing slides and CSS
+motion is cut to almost nothing. The washes stay, because a colour change is
+not movement.
+
+## Worth knowing before you copy it
+
+The slot layer ignores pointer events, so anything clickable needs
+`pointerEvents: "auto"`. A toolbar that does not respond to clicks is almost
+always this.
+
+See [Draw the chrome](/guides/chrome/) to write your own, and [the
+`lekh/canvas` reference](/reference/canvas/#slots) for every field list.

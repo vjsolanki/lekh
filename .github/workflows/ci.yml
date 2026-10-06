@@ -1,0 +1,70 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    name: Format, lint, build, typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm format:check
+      - run: pnpm lint
+      # Build before the type-aware lint and the typecheck: the docs site
+      # resolves the library through its published types in dist/, and without
+      # them every `lekh` import is an error type that the type-aware rules
+      # report as a fault in the docs site rather than a missing build.
+      - run: pnpm build
+      - run: pnpm lint:types
+      - run: pnpm typecheck
+      # The docs site's tests read the library's build too, so they run here
+      # after it rather than in the test matrix below.
+      - run: pnpm --filter @lekh/docs test
+
+  test:
+    name: Test (node ${{ matrix.node }}, react ${{ matrix.react }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node: [22, 24]
+        react: [18, 19]
+    steps:
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v5
+        with:
+          node-version: ${{ matrix.node }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Downgrade to React 18
+        if: matrix.react == 18
+        run: >
+          pnpm --filter lekh add -D
+          react@^18.3.1 react-dom@^18.3.1
+          @types/react@^18.3.12 @types/react-dom@^18.3.1
+      # The browser project drives a real pointer through a real layout engine,
+      # which a DOM emulator cannot do.
+      - name: Install Chromium
+        run: pnpm --filter lekh exec playwright install --with-deps chromium
+      # The public-API snapshot reads dist/, where the star re-export of
+      # ./surface has been flattened into the list a Consumer can actually
+      # import. Source would have to be parsed and resolved to say the same.
+      - run: pnpm --filter lekh build
+      - run: pnpm --filter lekh test

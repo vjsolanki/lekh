@@ -1,0 +1,88 @@
+---
+/**
+ * The example editor, given the whole window, with the agent plugged in.
+ *
+ * A page of its own rather than a docs page, because three panes squeezed into
+ * a reading column is not an editor anybody can judge. The prose that explains
+ * how it is assembled lives at /example/, and the agent at /example/agent/.
+ */
+import EditorWithAgent from "../components/agent/plug.tsx";
+// Both Geist voices, self-hosted and variable.
+// oxlint-disable-next-line import/no-unassigned-import
+import "@fontsource-variable/geist";
+// oxlint-disable-next-line import/no-unassigned-import
+import "@fontsource-variable/geist-mono";
+// Named here as well as inside the component, so the stylesheet is in the page
+// bundle rather than left to Astro's handling of a client-only island. This is
+// one of two pages that import it (the front page is the other), which is what
+// keeps Tailwind's preflight away from Starlight's own styles.
+// oxlint-disable-next-line import/no-unassigned-import
+import "../styles/editor.css";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Example editor — lekh</title>
+    <meta
+      name="description"
+      content="A complete drag-and-drop email editor with an agent, assembled from lekh's parts and running against the real library."
+    />
+    <link rel="canonical" href="/editor/" />
+    <script is:inline>
+      /*
+       * The theme, before the first paint.
+       *
+       * Inline and blocking on purpose: a deferred module script runs after the
+       * document has been painted, and a dark editor that flashes white for a
+       * frame is worse than no toggle at all.
+       *
+       * `lekh-editor-theme` is also read and written by the theme choice in the
+       * top bar's ⋯ menu — see `components/editor/theme.tsx`. The editor keeps its own key
+       * rather than Starlight's, because this page is a full-screen application
+       * and somebody reading the documentation in light may well want it dark.
+       */
+      (() => {
+        let stored;
+        try {
+          stored = localStorage.getItem("lekh-editor-theme");
+        } catch {
+          // A private window can refuse storage outright. Fall through to the
+          // operating system's answer.
+        }
+        const dark =
+          stored === "dark" ||
+          (stored !== "light" &&
+            matchMedia("(prefers-color-scheme: dark)").matches);
+        if (dark) document.documentElement.classList.add("dark");
+      })();
+    </script>
+  </head>
+  <body>
+    <EditorWithAgent client:only="react">
+      <p slot="fallback" class="lekh-boot">Starting the editor…</p>
+    </EditorWithAgent>
+  </body>
+</html>
+
+<style is:global>
+  /* The one thing on this page that is not a React component: what shows while
+     the island is still being fetched. */
+  .lekh-boot {
+    display: grid;
+    place-items: center;
+    height: 100%;
+    margin: 0;
+    font:
+      500 0.8125rem/1.4 "Geist Mono Variable",
+      ui-monospace,
+      SFMono-Regular,
+      Menlo,
+      monospace;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--muted-foreground);
+  }
+</style>

@@ -1,0 +1,1000 @@
+---
+title: lekh/blocks
+description: "The built-in Blocks, ready to compose into an editor."
+---
+
+import { Code } from "@astrojs/starlight/components";
+import extend from "../../../examples/extend-shipped-block.tsx?raw";
+import socialIcons from "../../../examples/social-icons.ts?raw";
+import pickBlocks from "../../../examples/pick-blocks.ts?raw";
+import { createReactEmailPreset } from "lekh/blocks";
+import BlockReference from "../../../components/BlockReference.astro";
+
+Fifteen Block Definitions covering an ordinary marketing email, built on
+[react.email](https://react.email). Use them as they are, mix them with your
+own, [pick only the ones you need](#pickreactemailpreset), or ignore this entry
+point entirely.
+
+The unsubscribe and postal address Blocks come from here too, as their own
+Preset. See [Compliance Blocks](/reference/compliance/).
+
+The core imports nothing from react.email. If you target MJML or your own
+component set, never import this and none of it reaches your bundle.
+
+![Gzipped size of lekh/blocks](https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2Fvjsolanki%2F5d00f9ab6617974fe2b6a95b643ce5b7%2Fraw%2Flekh-blocks.json)
+
+## Import
+
+```ts
+import { createReactEmailPreset, REACT_EMAIL_ROOT_TYPE } from "lekh/blocks";
+
+const definitions = createReactEmailPreset({ fontFamily: "Inter, sans-serif" });
+const editor = createEditor({ definitions, rootType: REACT_EMAIL_ROOT_TYPE });
+```
+
+`@react-email/components` is an optional peer dependency. Install it if you
+import this.
+
+## createReactEmailPreset
+
+```ts
+function createReactEmailPreset(options?: ReactEmailPresetOptions): Preset;
+```
+
+Returns an array of Block Definitions. Spread it to add your own:
+
+```ts
+const definitions = [...createReactEmailPreset(), myBlock];
+```
+
+### Options
+
+| Option            | Type                         | Default     | What it does                                  |
+| ----------------- | ---------------------------- | ----------- | --------------------------------------------- |
+| `fontFamily`      | `string`                     | A safe sans | Default font stack for every email.           |
+| `fonts`           | `readonly ReactEmailFont[]`  | `[]`        | More fonts your users can pick for an email.  |
+| `colors`          | `readonly ReactEmailColor[]` | `[]`        | Brand Colours offered beside every colour.    |
+| `contentWidth`    | `number`                     | `600`       | Default width of the content column, in px.   |
+| `backgroundColor` | `string`                     | `"#f6f6f6"` | Default colour behind the content.            |
+| `textColor`       | `string`                     | `"#333333"` | Default colour of text and headings.          |
+| `linkColor`       | `string`                     | `"#0b57d0"` | Default colour of links in text and headings. |
+| `language`        | `string`                     | `""`        | Default language tag, such as `"en"`.         |
+| `direction`       | `"ltr" \| "rtl"`             | `"ltr"`     | Which way a new email runs.                   |
+| `icons`           | `readonly ReactEmailIcon[]`  | `[]`        | Icons your users can pick in an icon row.     |
+
+These are starting points, not locks. Each one is the default of a prop
+somebody can change per email.
+
+### Fonts
+
+```ts
+const definitions = createReactEmailPreset({
+  fontFamily: "Inter, Arial, sans-serif",
+  fonts: [{ label: "Serif", stack: "Georgia, serif" }],
+});
+```
+
+Each email stores its own font, as `fontFamily` on the root. Your users pick it
+from a list: your `fontFamily` first, labelled "Default", then your `fonts`. To
+give the default your own label or place, list its stack in `fonts`.
+
+```ts
+interface ReactEmailFont {
+  readonly label: string; // what your users pick it by
+  readonly stack: string; // what the email stores and writes
+  readonly webFont?: ReactEmailWebFont; // files that load the font
+}
+```
+
+The email stores the stack, not the label. So a stored email still renders the
+same after you change or remove a list entry. An email with no font of its own
+renders in your default.
+
+A stack that is not on your list renders exactly as stored. Your inspector
+should show it as a custom choice your users can switch away from.
+
+A stack may hold letters, digits, spaces, commas, hyphens and matching quotes.
+Anything else renders in your default font, and the root raises an
+`font-family-unsafe` warning. Its Repair, a fix your users can apply in one
+click, puts the default back.
+
+`createReactEmailPreset` throws if your own `fontFamily` or a stack in `fonts`
+breaks that rule.
+
+#### Web fonts
+
+Most fonts are not installed on most of your readers' machines. To load yours,
+give its `fonts` entry a `webFont`:
+
+```ts
+const definitions = createReactEmailPreset({
+  fontFamily: "Inter, Arial, sans-serif",
+  fonts: [
+    {
+      label: "Inter",
+      stack: "Inter, Arial, sans-serif",
+      webFont: {
+        faces: [
+          { url: "https://cdn.example.com/inter-400.woff2", weight: 400 },
+          { url: "https://cdn.example.com/inter-700.woff2", weight: 700 },
+          {
+            url: "https://cdn.example.com/inter-400-italic.woff2",
+            weight: 400,
+            style: "italic",
+          },
+        ],
+      },
+    },
+  ],
+});
+```
+
+```ts
+interface ReactEmailWebFont {
+  readonly faces: readonly ReactEmailFontFace[];
+}
+
+interface ReactEmailFontFace {
+  readonly url: string; // an absolute https URL
+  readonly weight?: number | readonly [number, number]; // default 400
+  readonly style?: "normal" | "italic"; // default "normal"
+}
+```
+
+The face is named after the first font in the stack, here `Inter`. So put the
+web font first. Give each weight your emails use a face of its own, or the
+mail client fakes bold and italic. Headings are bold by default. For a variable
+font, give one face a range, such as `weight: [300, 800]`.
+
+To load a web font for your default, list the default's stack in `fonts`, as
+above. The email still stores only the stack, never a URL.
+
+The email loads the web font only when its stack is listed with one. A listed
+font with no `webFont`, or a stack that is not on your list, renders exactly as
+it did before.
+
+The markup gets one `@font-face` rule per face, in a `<style>` of its own in
+the `<head>`. The format comes from the file's extension: `.woff2`, `.woff`,
+`.ttf` or `.otf`. The editor shows the web font too, so line breaks match the
+email.
+
+**Web fonts are best-effort.** Apple Mail and iOS Mail load them. Gmail drops
+them. Classic Outlook on Windows never reads them, and falls back to the next
+font in the stack, here Arial. So pick that next font with care: many of your
+readers see it.
+
+`createReactEmailPreset` throws if a face's URL is not an absolute `https`
+URL, or has a quote, backslash, `<`, `>` or space in it. It also throws for a
+weight outside 1 to 1000, an empty `faces`, a stack that starts with a generic
+name such as `sans-serif`, or one stack listed twice with different web fonts.
+
+### Icons
+
+<Code code={socialIcons} lang="ts" title="social-icons.ts" />
+
+`icons` is the menu your users pick from for each icon in an
+[icon row](#the-icon-row). Each entry is already hosted, so picking one asks
+your `resolveImage` for nothing. A new row starts with the first three, with
+their `href`. Fewer than three, and the rest start empty.
+
+```ts
+interface ReactEmailIcon {
+  readonly label: string; // what your users pick it by
+  readonly asset: Asset; // a hosted picture, with its real size
+  readonly href?: string; // where a new row's icon links to
+}
+```
+
+It is a menu, not a gate. Your users can still upload any icon. The picked
+picture is copied into the email, so the email still works if you change the
+list later. lekh ships no icon files.
+
+`createReactEmailPreset` throws an `Error` if an icon has no `src`, or a width
+or height that is not above zero.
+
+Get the files right, because a mail client will not forgive them:
+
+- **Use PNG at twice the size it shows.** A 32px icon is a 64 by 64 file. Do
+  not use SVG: classic Outlook does not show it, and Gmail on the web turns it
+  into a blurry bitmap.
+- **Use the network's own colour, or plain black or white.** The big networks'
+  brand rules forbid recolouring or outlining their logos.
+- **Give a dark icon a light outline or a shape behind it.** Mail apps in dark
+  mode invert colours, and a black logo can vanish on a black background.
+- **Make the alt text name the destination**, such as "Acme on Instagram". Not
+  "icon", and not "Instagram logo".
+
+### Text and link colours
+
+```ts
+const definitions = createReactEmailPreset({
+  textColor: "#222222",
+  linkColor: "#c2410c",
+});
+```
+
+Each email stores its own `textColor` and `linkColor` on the root. Text and
+headings use the email's text colour until someone sets a colour on the Block.
+Clearing that colour puts the Block back on the email's.
+
+Every link in text and headings is written in the email's link colour. The
+colour goes inline on each `<a>`, because mail clients do not reliably colour a
+link from the text around it. Buttons, dividers and the compliance Blocks keep
+their own colours. The [nav](#the-nav) starts in the email's link colour
+until someone sets its own.
+
+A root colour must be a hex or `rgb()` colour with no transparency. Anything
+else renders in your default, and the root raises an `email-color-unusable`
+warning. Its Repair puts the default back. `createReactEmailPreset` throws if
+your own `textColor` or `linkColor` breaks that rule.
+
+Headings stored before this change, with no colour of their own, are migrated
+to `#111111`. They look the same as before.
+
+### Brand Colours
+
+```ts
+const definitions = createReactEmailPreset({
+  colors: [
+    { label: "Orange", value: "#ff5a1f" },
+    { label: "Ink", value: "#111111" },
+  ],
+});
+```
+
+Brand Colours are named colours your users can pick from. An Agent, a model
+you give lekh's tools so it can suggest changes, sees them too. Every colour
+and background setting of the Preset's Blocks lists them as
+`constraints.brandColors`. Read them
+with [`brandColorsOf`](/reference/lekh/#schema-entries) and draw them as swatches beside
+the field.
+
+```ts
+interface ReactEmailColor {
+  readonly label: string; // what your users pick it by
+  readonly value: string; // what the email stores
+}
+```
+
+The email stores the colour, not the label. So changing or removing a Brand
+Colour leaves stored emails as they were. Your users can still pick any other
+colour.
+
+[`describeBlocks`](/reference/lekh/) names them in each colour prop's
+description, so an Agent asked to "make it on-brand" knows what that means.
+
+Your own Blocks don't get them from the Preset. To offer them there too, add
+`brandColors` to your colour entries' `constraints` yourself.
+
+A Brand Colour must be a hex or `rgb()` colour with no transparency.
+`createReactEmailPreset` throws on one that is not, naming its label.
+
+### Language
+
+```ts
+const definitions = createReactEmailPreset({ language: "en" });
+```
+
+Each email stores its own `language` on the root, as a tag such as `en`,
+`fr-CA` or `pt-BR`. Your `language` is what a new email starts with.
+
+It defaults to empty, so a new email has no language until someone sets one.
+
+The email writes the tag as `lang` on the `<html>`, the `<body>` and a
+full-width table cell around everything in the email. Some mail clients drop or
+rewrite the `<html>` and `<body>` tags, so the cell is the one that survives.
+
+The cell has no padding and no width of its own. It changes nothing about the
+layout.
+
+The editor stores whatever your users type. The email writes it only if it
+looks like a tag: two or three letters, then any number of parts made of
+letters and digits, each after a hyphen.
+
+Spaces around the tag are trimmed. An empty or malformed value, such as
+`"en us"` or `"en_US"`, writes no `lang` at all.
+
+Before this, every email was written with `lang="en"`, whatever it was in. An
+email stored before then has no language, so it now writes no `lang`.
+
+### Direction
+
+```ts
+const definitions = createReactEmailPreset({ direction: "rtl" });
+```
+
+Each email stores its own `direction` on the root: `"ltr"`, left to right, or
+`"rtl"`, right to left. Your `direction` is what a new email starts with. An
+email stored without one runs left to right.
+
+The direction is separate from the language. Nothing is guessed from the
+language tag.
+
+The email writes it as `dir` on the `<html>`, the `<body>` and the same table
+cell that carries `lang`. It is always written, `ltr` included. The cell also
+gets `direction` as CSS, in case a mail client drops the attribute. Any value
+other than `"rtl"` writes `ltr`.
+
+`dir` on that cell reaches every table inside it. So a row's columns run right
+to left by themselves, and columns stacked on a phone stay in the order they
+are stored. Padding does not flip: `paddingLeft` is always the left.
+
+### Alignment
+
+Every `align` prop stores `"start"`, `"center"` or `"end"`. Start is the side
+the email reads from: the left in a left-to-right email, the right in a
+right-to-left one. End is the other side.
+
+The email always writes a real side, `left` or `right`. Outlook on the desktop
+and Yahoo ignore `text-align: start`, so it is never written. A phone-only
+alignment is turned into a side the same way.
+
+So switching an email's direction moves every aligned Block to match. An
+`align` value that is not one of the three renders as the Block's default.
+
+**Mapping a right-to-left template?** Its `text-align: right` is `"start"`, and
+its `left` is `"end"`. In a left-to-right template, `left` is `"start"` and
+`right` is `"end"`.
+
+Emails stored before this held `"left"` or `"right"`. They are migrated to
+`"start"` and `"end"`, on the Block and in its phone-only values, and look the
+same as before.
+
+## pickReactEmailPreset
+
+```ts
+function pickReactEmailPreset(
+  blocks: readonly ReactEmailBlock[],
+  options?: ReactEmailPresetOptions,
+): Preset;
+```
+
+Throws an `Error` if an entry is listed twice, or is not one of the Blocks in
+the table below.
+
+Builds only the Blocks you list. The Blocks you leave out never reach your
+bundle, so you only ship code your users can use.
+
+<Code code={pickBlocks} lang="ts" title="pick-blocks.ts" />
+
+It takes the same options as `createReactEmailPreset`.
+
+- `email` and `section` are always in. Without them, no email is valid.
+- A Block that only lives inside another comes with it. List `columnsBlock`
+  and you get `column` too. You never list those.
+- The Blocks come in the order you list them, after `email` and `section`.
+
+| Export         | Registers              |
+| -------------- | ---------------------- |
+| `columnsBlock` | `columns` and `column` |
+| `headingBlock` | `heading`              |
+| `textBlock`    | `text`                 |
+| `imageBlock`   | `image`                |
+| `buttonBlock`  | `button`               |
+| `dividerBlock` | `divider`              |
+| `spacerBlock`  | `spacer`               |
+| `htmlBlock`    | `html`                 |
+| `iconRowBlock` | `icon-row` and `icon`  |
+| `navBlock`     | `nav` and `nav-link`   |
+
+Each one is a `ReactEmailBlock`. Its `type` is the type it registers. The rest
+of it is internal.
+
+```ts
+interface ReactEmailBlock {
+  readonly type: string;
+}
+```
+
+## REACT_EMAIL_ROOT_TYPE
+
+```ts
+const REACT_EMAIL_ROOT_TYPE = "email";
+```
+
+The root type these Definitions are built around. Pass it as `rootType` rather
+than typing the string, so a rename cannot catch you out.
+
+## The Blocks
+
+### Containers
+
+`email`, `section`, `columns` and `column` hold other Blocks. What each holds,
+and every prop it has, is in [Every Block's props](#every-blocks-props).
+
+`previewText` on the root is the line some mail clients show next to the
+subject. It renders hidden.
+
+`fontFamily` on the root is the email's font. The body, `heading`, `text`,
+`button` and the compliance Blocks all write it. There is one font per email.
+See [Fonts](#fonts).
+
+`textColor` and `linkColor` on the root are the email's ink and link colours.
+`heading` and `text` follow them. `nav` follows the link colour. See
+[Text and link colours](#text-and-link-colours).
+
+`language` on the root is the email's language tag. See
+[Language](#language).
+
+`direction` on the root is which way the email runs. See
+[Direction](#direction).
+
+`contentBackgroundColor` on the root is the email's column colour. Every
+section and row with no content colour of its own uses it, so a white column on
+a grey page is one setting. A section or row that sets its own keeps it, and one
+set to `none` stays clear. A text, image or other Block placed straight on the
+root has no column, so it sits on the page colour. Unset, or `none`, colours
+nothing.
+
+`backgroundImage` on the root is a picture behind the whole page. See
+[A picture behind the page](#a-picture-behind-the-page).
+
+A container is one Block with two surfaces. `backgroundColor` paints the whole
+width of whatever window the email is read in; `contentBackgroundColor` paints
+the column inside it, which is `contentWidth` wide and centred. Padding, and a
+border, belong to that column. This is what lets a section's colour run to the
+edge of the screen while the words stay in a readable measure. It is also
+why clicking beside the content selects the container it belongs to.
+
+A section's border and a row's border both go round the padding. So a section
+and a row with the same border and padding line up when you stack them.
+
+### A picture behind the content
+
+`contentBackgroundImage` puts a picture behind a section's or a row's content.
+It sits in the Content group, next to `contentBackgroundColor`. Unset means no
+picture.
+
+- **It always covers the content and is centred.** It never repeats, and there is
+  nothing to configure.
+- **The content colour is its fallback.** Many mail clients block pictures until
+  the reader allows them. Then the content colour is all that shows, so pick a
+  colour your text reads on. With a picture and no content colour, the section
+  or row gets a `background-image-color-missing` warning.
+- **It is decoration.** The Asset's `alt` is ignored.
+- **An unsafe address draws no picture.** A `javascript:` URL, for one, or a
+  `data:` URL that is not an image. The content colour shows instead.
+
+It is an optional Asset, not a Primary one. A dropped file never becomes a
+section, and placing one asks for no picture.
+
+Set it with `editor.replaceImage(id, "replace", "contentBackgroundImage")`. See
+[Handle images and uploads](/guides/images/#one-picture-a-block-is-any-number-it-holds).
+
+Classic Outlook on Windows ignores the CSS, so the Preset also draws the picture
+there with VML. Outlook draws it with square corners, even on a row with a
+`borderRadius`. It also stops at the padding, which shows the content colour. Every email carries the VML namespaces on `<html>` and a
+96 DPI setting in its head, whether it uses a picture or not.
+
+### A picture behind the page
+
+`backgroundImage` on the root puts a picture behind the whole email: a
+texture, or a pattern. Unset means no picture.
+
+- **It always tiles**, from the top left. It suits a small image that repeats.
+  There is nothing to configure.
+- **The page colour is its fallback.** With pictures blocked, `backgroundColor`
+  is what shows. With a picture and the page colour set to `none`, the root gets
+  a `background-image-color-missing` warning.
+- **It is decoration.** The Asset's `alt` is ignored.
+- **An unsafe address draws no picture.** A `javascript:` URL, for one, or a
+  `data:` URL that is not an image.
+
+Set it with `editor.replaceImage(rootId, "replace", "backgroundImage")`.
+
+Page pictures are best-effort. The Preset writes the picture as CSS on the body
+and on the cell around everything, and as the body's `background` attribute.
+Classic Outlook on Windows gets a VML fill instead. Some clients ignore all of
+these, so only ever put the page colour's job on the picture, never the
+content's.
+
+### Every Block has padding
+
+Every Block but the root, `spacer`, `icon` and `nav-link` has four padding props: `paddingTop`,
+`paddingRight`, `paddingBottom` and `paddingLeft`. Each has its own phone-only
+value, so a phone can loosen one side and keep the others.
+
+The padding sits on a table cell, and the phone-only class sits on that same
+cell. For a container, the cell is inside the content column, so padding never
+breaks the band of colour. The class that hides a Block on a phone stays on the
+outermost element.
+
+Version 1 of `section`, `columns` and `column` split the padding. Version 0
+stored `paddingY` and `paddingX` on a section or row, and one `padding` on a
+column. Loading an older email splits them into the four sides, phone-only
+values included. A side that was never set stays unset.
+
+### Every Block picks its screens
+
+Every Block but the root, `icon`, `nav-link` and the compliance Blocks has `showOn`:
+
+| Value       | Label        | What it does                                      |
+| ----------- | ------------ | ------------------------------------------------- |
+| `"all"`     | All screens  | The default. The Block shows everywhere.          |
+| `"desktop"` | Desktop only | Hidden on a phone, by a class in the media query. |
+| `"mobile"`  | Mobile only  | Hidden everywhere but a phone.                    |
+
+A column offers only `"all"` and `"desktop"`. A column is a table cell, and a
+row missing one of its columns on desktop no longer adds up to a hundred.
+
+**Mobile-only content is not seen where a mail client strips styles.** That
+includes the Gmail app reading a non-Google account, and any email whose
+stylesheet gets clipped. Those readers get the desktop email. So never make a
+mobile-only Block the only copy of something: pair it with a desktop-only copy.
+While `"mobile"` is picked, `showOn` names those readers in its `clients`
+notes, which say what a mail client does with a value.
+
+A mobile-only Block is wrapped in a `<div>` that is hidden inline. A rule in
+the media query shows it on a phone. Its markup also sits inside an
+`<!--[if !mso]>` comment, so Outlook on the desktop never shows it.
+
+`showOn` replaced a boolean `hideOnMobile`. Loading an older email turns
+`hideOnMobile: true` into `showOn: "desktop"` and drops the old key. That is
+version 2 of `section`, `columns`, `column` and `heading`, and version 1 of
+`text`, `image`, `button` and `divider`.
+
+### Every Block has a background
+
+`backgroundColor` is on every Block in this Preset but `html`, `icon` and
+`nav-link`, not only the containers. An icon sits on its row's, and a nav link on
+its nav's. A heading takes a highlight, an image takes something to sit behind
+its transparency, a footer line takes a tinted strip — none of which should
+mean wrapping the Block in a section first.
+
+Two of them start at a real colour rather than at nothing: the root, which is
+the page the email is read on, and `button`, which is not a button without a
+fill. Everywhere else the default is no colour at all.
+
+`divider` is the one that needs a word of explanation. An `<hr>` is a border and
+nothing else. Its box is zero pixels tall, so a background on the rule itself
+would paint nothing. The background goes on the cell around it, which is the
+cell its padding is on.
+
+### Colours that are not there
+
+Every background in this Preset starts as the string `"none"`, and that is what
+is stored when your user clears one.
+
+**`"none"` is not a CSS colour, so never put one of these values straight into a
+style.** The Preset's own Blocks pass them through a helper that emits no
+declaration at all when there is no colour, the same way a border of zero width
+emits nothing. If you write your own Block against these props, do the same:
+
+```tsx
+const background = (color: string) =>
+  color === "none" ? {} : { backgroundColor: color };
+```
+
+Omitting is also the most portable answer. `background-color` is transparent
+until something says otherwise, so no declaration and a transparent one paint
+identically everywhere, Outlook included. A Document that stores `"transparent"`
+still renders correctly, since that is a real colour, so nothing needs
+migrating.
+
+`columns` arrives holding two columns, so dropping it once gives a working row.
+A column is part of the row's shape instead of something to drag: it is not in
+the palette, it cannot be dragged, and clicking one selects the row that owns it.
+The row is where every column is configured. Ask `editor.getEditableChildren()`
+with the row selected for each column's props and its delete, and
+`editor.getAddableChildren()` for the Add button. A row will not be left holding
+one column.
+
+`width` is a percentage, and the columns of a row always come to a hundred.
+Setting one moves its neighbour, so the row stays whole. The slider's maximum
+is whatever that neighbour can spare, which is usually less than a hundred. A
+new column arrives at 10%, paid for by the nearest column with room, and a
+deleted one hands its width back to its neighbour. On a phone the widths stop
+mattering, because each column stacks to the full width of the screen.
+
+Both mobile decisions belong to `columns`, not to a column: `stackOnMobile` and
+`reverseOnMobile`. Stacking one column and not its neighbour
+would produce markup nothing renders sensibly, so the row owns the switch and
+that state is unreachable. `showOn` stays on the column, because hiding one
+of them on a phone is a sensible thing to want.
+
+How the columns sit against each other belongs to the row too:
+
+- `verticalAlign` lines the columns up when one is taller than the others. It
+  is written inline on every column, so a mail client that strips the `<style>`
+  keeps it. Once the columns stack it does nothing.
+- `gap` is the space between columns in px. The row puts a gap cell between
+  each pair, never before the first or after the last. On a
+  phone the stacked gap cell becomes the gap between columns, so you don't set it
+  twice. The gap cell has no colour, so the row's content colour shows through.
+
+**A column hidden on a phone keeps its gap cell**,
+so you get a double gap where it was. And classic Outlook on Windows has not been
+tested with a gap: browsers shrink the columns to make room, Outlook may not.
+
+The section, the row and each column take a border as
+`borderWidth` / `borderStyle` / `borderColor` / `borderRadius`. Width zero means
+no border. **`borderRadius` is best-effort**: Outlook's Word engine ignores a
+radius on a table, so a row squares off there, and a column with a background of
+its own paints a square corner over the row's rounded one. Build a rounded card
+from a column's own background and radius, not from the row's.
+
+### Leaves
+
+`heading`, `text`, `image`, `button`, `divider`, `spacer`, `html`, `icon-row`
+and `nav` hold no Blocks you place. An icon row and a nav hold only their own
+icons and links. Their props are in [Every Block's props](#every-blocks-props).
+
+Every `align` stores `start`, `center` or `end`, and the email writes the real
+side. See [Alignment](#alignment).
+
+`heading` and `text` hold rich text, so they need a Text Engine before anybody
+can type into them. See [lekh/tiptap](/reference/tiptap/).
+
+`text` holds paragraphs. Return starts one and Shift+Return breaks the line. A
+`heading` stays one line, so Return breaks the line there.
+`paragraphSpacing` is the gap between paragraphs, in px. See
+[Paragraphs](/guides/rich-text/#paragraphs).
+
+`text` holds bullet and numbered lists too, one level deep. A `heading` does
+not. A list counts as one paragraph for `paragraphSpacing`.
+
+`listItemSpacing` is the gap between items, in px. Lists are indented by one and
+a half times the font size, on the side the text starts from.
+
+See [Lists](/guides/rich-text/#lists).
+
+`heading` and `text` set their own `lineHeight`, `fontWeight` and
+`letterSpacing`. The line height is a multiple of the font size. The letter
+spacing is in px, as it is on the button and the nav.
+
+The line height is written as a percentage, so `1.5` is `150%`. Classic Outlook
+reads a bare `1.5` as `100%`. A stored value out of range is clamped, and a
+weight that is not on the list is written as the nearest one that is.
+
+`heading` and `text` render as a one-cell table. The cell carries the padding,
+background, font size, alignment and phone-only class. The `<h1>` or each `<p>`
+carries the font, colour, line height, weight, letter spacing and margins.
+
+Each list and list item in `text` carries the same. They all size themselves
+at `1em` of the cell, so a phone-only font size reaches every paragraph and
+item.
+
+`image` and `button` sit in a one-cell table too, with the padding on the cell.
+
+`image` needs a `resolveImage` function before a picture can be added. See
+[Handle images and uploads](/guides/images/). Its `width` is a ceiling, not a
+size: it starts at the email's content width, and the picture shrinks to fit a
+narrower column or a phone without losing its proportions.
+
+`borderRadius` rounds the picture itself. Its maximum, 400, is enough to make a
+square photo round. **Classic Outlook shows square corners.**
+
+### The divider
+
+The divider is a line: the top border of an `<hr>`, and no other edge.
+`thickness` is the line's, in px. `width` is a percent of the cell the line
+sits in.
+
+`align` goes on the cell around the line and as auto margins on the `<hr>`.
+You only see it when `width` is under 100.
+
+### The spacer
+
+`spacer` is a blank gap between Blocks, `height` px tall. It has no padding,
+since it is spacing itself. With no background colour, what is behind it shows
+through.
+
+It renders as one full-width table cell holding a `&nbsp;`. The cell writes the
+height as an attribute and as `height` and `line-height`. A zero font size and
+`mso-line-height-rule:exactly` stop classic Outlook growing a small gap to a
+line of text.
+
+A phone-only height writes both `height` and `line-height` on that cell. A gap
+tuned for desktop is often too big on a phone.
+
+### The icon row
+
+`icon-row` is small linked pictures side by side, such as your social links.
+They stay side by side on a phone, and wrap only when they run out of room.
+
+`iconSize` is the width of every icon, in px. Each icon is as tall as its own
+picture's proportions make it. `gap` is the space between icons.
+
+A row holds `icon` Blocks and arrives holding three. Like a column, an `icon`
+is structural: your users reach it through its row. Its `asset` lists your
+[icons](#icons). An empty `href` draws the icon with no link.
+
+An icon with no picture is an error. That is a Diagnostic, a problem the
+editor reports about an email (see [Diagnostics](/guides/diagnostics/)). The
+email leaves the icon out. On
+the Canvas it shows as a faint square, so your users can see and pick it. An
+icon with no alt text is a warning.
+
+The icon's `asset` is not a Primary Asset, the one picture a Block _is_ (see
+[One picture a Block is](/guides/images/#one-picture-a-block-is-any-number-it-holds)).
+A dropped file never becomes an icon,
+and placing a row asks for no picture. Set one of your listed icons with
+`setProp`, or ask for an upload by naming the prop:
+
+```ts
+editor.replaceImage(iconId, "replace", "asset");
+```
+
+The icons are inline-block links in one cell, so they wrap like words. The cell
+has a zero font size and line height, which removes the gaps a mail client puts
+between and under them. The gap is padding on the side the email runs towards,
+on the link, never a margin on the picture: classic Outlook ignores image
+margins. The last icon has none.
+
+Classic Outlook has no inline-block. So the row also writes a table only
+Outlook reads, with one cell per icon, which keeps them in one line there.
+
+**Untested in classic Outlook:** whether that table runs right to left in an
+`rtl` email, and whether the link's padding adds to its cell's. Check both in
+a real send before you rely on them.
+
+### The nav
+
+`nav` is a row of text links, such as a header's menu. On a phone the links wrap
+like words, or stack one per line if you turn on `stackOnMobile`.
+
+- `gap` is the space between links, and each side of a separator, in px.
+- `separator` is up to 3 characters between links, such as `|`. Empty for none.
+- `color` is the colour of the links and separators. It starts at the email's
+  link colour. Set it when the nav sits on a band of its own colour, or the
+  links may not read on it.
+- `stackOnMobile` puts one link per line on a phone, with no separators.
+
+The font is the email's. The line height is the font size times 1.4, in px.
+Classic Outlook reads a bare multiplier as `100%`.
+
+A nav holds `nav-link` Blocks and arrives holding three. Like an icon, a
+`nav-link` is structural: your users reach it through its nav. Its `label` is
+the text, and a new nav's links start "Link 1" to "Link 3". An empty `href`
+draws the link with no link.
+
+A link with no label is an error, a Diagnostic the editor reports about an email
+(see [Diagnostics](/guides/diagnostics/)). The email leaves the link out, and
+the separator after it. On the Canvas it shows a faint "Link", so your users can
+see and pick it.
+
+A link with no `href` is a `nav-link-href-missing` warning. The email draws it
+as a `<span>`, never as a link to nowhere.
+
+Each link is an inline-block `<a>` in one cell. The gap is padding on the side
+the email runs towards, and the last link has none. A separator is a `<span>`,
+never a link.
+
+Classic Outlook ignores padding on inline elements. So the nav also writes a
+table only Outlook reads, with a cell for each link and separator.
+
+**A wrapped line can end on a separator.** The email cannot know where a mail
+client breaks the line. If that matters, turn on `stackOnMobile`.
+
+Stacking works wherever the mail client keeps the `<style>`. Elsewhere the
+links wrap.
+
+**Untested in classic Outlook:** whether the Outlook table runs right to left
+in an `rtl` email. Check it in a real send before you rely on it.
+
+### The html Block
+
+`html` holds markup your users write by hand, in its `html` prop. The prop is
+stored exactly as they wrote it.
+
+The editor stores what they typed. The library cleans the markup on the way
+out, in the Canvas and in the email alike, so they see what is sent. The email never
+refuses to render over cleaned markup.
+
+**What is dropped:**
+
+- Any tag not on the list. The list covers tables and their parts, `div`,
+  `span`, `p`, `br`, `img`, `a`, `font`, `center`, `b`, `strong`, `i`, `em`,
+  `u`, `s`, `h1` to `h6`, lists, `hr`, `sup`, `sub` and `style`. A dropped tag
+  keeps its text.
+- `script`, `title`, `iframe`, `object`, `embed`, `template`, `noscript` and
+  `head`, with everything inside them.
+- Any attribute not on the list, and every `on…` attribute. The list covers
+  `style`, `class`, `id`, the sizing and table attributes, `bgcolor`,
+  `background`, `color`, `face`, `size`, `href`, `src`, `alt`, `title`, `dir`,
+  `lang`, `role` and `aria-*`.
+- A link or image whose URL has a scheme other than `http`, `https`, `mailto`
+  or `tel`. URLs with no scheme stay, so merge tags like `{{url}}` and
+  `*|UNSUB|*` work. `data:image/` is allowed in an image's `src` only. The
+  attribute goes, not the element.
+- `expression(…)` and unsafe `url()` values in CSS. The declaration goes.
+
+Comments stay, Outlook's `<!--[if mso]>` comments included.
+
+**A whole email keeps only its body.** If the markup has a `<body>`, only
+what is inside it is kept. `html`, `head` and `body` tags are dropped wherever
+they appear.
+
+**A `<style>` only reaches the Block's own markup.** The cell round the markup
+has the class `lekh-h-<blockId>`, and every selector gets it in front. So
+`td { padding: 0 }` becomes `.lekh-h-<blockId> td { padding: 0 }`, inside
+`@media` too. `html`, `body` and `:root` mean that cell itself. `@font-face`
+stays. Every other at-rule, `@import` among them, is dropped.
+
+**Unbalanced markup can break the email after it.** The markup goes out with
+the structure your users wrote. A stray `</td>` or an unclosed `<table>` is not
+fixed. It looks fine in the Canvas and can break the Blocks after it in the
+sent email.
+
+Three warnings say when cleaning will change the markup:
+`html-markup-removed`, `html-markup-unbalanced` and `html-whole-document`. See
+[Built-in codes](/guides/diagnostics/#built-in-codes).
+
+The cell carries the padding and the phone-only class. Empty markup renders
+nothing. The Canvas shows its usual empty-Block mark in its place.
+
+**To turn it off**, filter it out of the Preset:
+
+```ts
+const definitions = createReactEmailPreset().filter((d) => d.type !== "html");
+```
+
+An email that already holds an html Block then holds a type nobody registered.
+Rendering it throws `UnknownBlockError`.
+
+### The button
+
+The button sets its own shape and label.
+
+- `innerPaddingY` and `innerPaddingX` are the space above and below the label,
+  and either side of it.
+- `fullWidth` fills the column, with the label centred. `fullWidthOnMobile`
+  does it on a phone only.
+- `borderWidth` zero means no border.
+
+The label's font follows the email's. Its `color` does not follow the email's
+text colour, because the label sits on the button's fill.
+
+The cell around the button carries `align`, the padding and the phone-only
+class. The inner padding, border and label styles go on the button's `<a>`.
+
+**`fullWidth` is best-effort in classic Outlook.** Outlook ignores `display` on
+a link, so the button there is likely only as wide as its label.
+
+## Every Block's props
+
+Read from `createReactEmailPreset()` when this site is built, so they cannot
+drift from the code. A default that comes from an
+[option](#options) shows the option's own default.
+
+- **Version** is what the Block writes today. Stamp it on every Block you write
+  by hand. See [The Document](/reference/document/#version-stamp-it).
+- **Kind** says what the value is. See
+  [Values](/reference/document/#values) for how each is stored.
+- **What it is** is the name your users see for it in an inspector.
+- **Phone-only value** says whether the prop can take a value of its own on
+  phones.
+
+<BlockReference definitions={createReactEmailPreset()} />
+
+## Control kinds these Blocks use
+
+Your inspector switches on `control.kind`. These are the kinds you need to
+handle to support the whole Preset:
+
+`text`, `number`, `boolean`, `color`, `select`, `align`, `url`, `rich-text`,
+`asset`, `width`, `surface-color`, `html`
+
+`html` is markup your users write by hand. Draw a code editor for it.
+
+`asset` comes in three shapes. The image Block's picture has `control.primary`
+set: offer "Replace" and alt text. The section's and row's
+`contentBackgroundImage`, and the root's `backgroundImage`, do not: offer
+"Choose image" while empty, then "Replace", and "Remove" through
+`control.reset()`.
+
+The icon's picture lists your [icons](#icons) in `constraints.options`, as
+`{ label, asset }`. Offer them as a menu and call `control.set(option.asset)`.
+That needs no image request. Offer an upload beside it, through
+`replaceImage`. Setting any other new picture with `set` is refused.
+
+Kinds are open strings. Using these same names in your own Blocks means one
+switch statement covers everything.
+
+A `select` lists its choices in `constraints.options`. A choice is a plain
+value, or `{ label, value }` when it needs a name your users can read. The
+root's `fontFamily` uses the second form.
+
+Show the label and store the value. When the current value matches no option,
+show it as `Custom (<value>)` rather than an empty select.
+
+`surface-color` is a colour that may be no colour. Every background in the
+Preset is one — the email's, a section's content background, a button's fill. It
+is not the same kind as `color`: a `color` always has a value, and a surface can
+be emptied. Miss it out of your switch and those controls render nothing at all,
+which is the easiest way to end up with an inspector that looks finished and has
+no background settings. Store `NONE` to empty one.
+
+`width` is a number with a maximum that moves. The editor works out what a
+column's neighbour can spare and puts it in `constraints.max`, so the same
+control you drew for `number` handles it, pointed at constraints that change as
+the row does.
+
+## Extending a shipped Block
+
+A Block's Schema lists the props your users can edit. You can spread a shipped
+Block Definition and add an entry to its Schema. Your users then get a control,
+and the editor stores what they set.
+
+**The new prop does nothing to the email until `render` reads it.** Only
+`render` turns a prop into markup. The shipped `render` does not know your prop
+exists.
+
+There are three cases:
+
+- **A phone-only value for a prop the Block already has.** Add `mobile` to the
+  prop's Schema entry. Each shipped Block puts its phone-only class on the cell
+  that holds its padding. So a prop styled on that cell needs no new `render`:
+  the background, and on `heading` and `text` the font size and alignment. A
+  prop styled on an element inside the cell, such as the image's `width`, needs
+  a new `render`.
+- **A new prop that styles something around the Block.** Wrap the shipped
+  `render` and put your element outside what it returns.
+- **A new prop that styles something inside the Block.** Replace `render`. A
+  corner radius on an image has to sit on the `<img>`. A wrapper with
+  `overflow: hidden` does not clip in Outlook.
+
+<Code code={extend} lang="tsx" title="extend-shipped-block.tsx" />
+
+A replaced `render` drops everything the shipped one did that you do not
+rewrite. Those props keep their controls and stop working. It also stops picking
+up fixes to the shipped `render`.
+
+Nothing warns you when a prop is never read. Render a Document with a
+non-default value and check the HTML.
+
+## Composing with the compliance Blocks
+
+The two Presets fit together with no configuration. The root and the column
+already accept `unsubscribe` and `postal-address`.
+
+```ts
+const definitions = [
+  ...createReactEmailPreset(),
+  ...createCompliancePreset({ unsubscribeUrl: "%%unsubscribe_link%%" }),
+];
+```
+
+See [Compliance Blocks](/reference/compliance/).
+
+## Diagnostic codes
+
+Every code this Preset raises is on one object, `PresetDiagnostic`. Each key is
+its code in camelCase. Match on these instead of on the strings, and present
+the problem in your own words.
+
+```ts
+PresetDiagnostic.fontFamilyUnsafe; // "font-family-unsafe"
+PresetDiagnostic.emailColorUnusable; // "email-color-unusable"
+PresetDiagnostic.backgroundImageColorMissing; // "background-image-color-missing"
+PresetDiagnostic.imageAltTextMissing; // "image-alt-text-missing"
+PresetDiagnostic.buttonHrefMissing; // "button-href-missing"
+PresetDiagnostic.iconImageMissing; // "icon-image-missing"
+PresetDiagnostic.iconAltTextMissing; // "icon-alt-text-missing"
+PresetDiagnostic.navLinkLabelMissing; // "nav-link-label-missing"
+PresetDiagnostic.navLinkHrefMissing; // "nav-link-href-missing"
+```
+
+The HTML Block's three codes are lekh's own, on `DiagnosticCode`.
+
+## Everything this entry point exports
+
+Nineteen names on this page, plus the five on
+[Compliance Blocks](/reference/compliance/#everything-on-this-page):
+
+`createReactEmailPreset`, `pickReactEmailPreset`, `REACT_EMAIL_ROOT_TYPE`,
+`ReactEmailPresetOptions`, `ReactEmailFont`, `ReactEmailColor`, `ReactEmailIcon`,
+`ReactEmailBlock`, `PresetDiagnostic`
+
+The Blocks for `pickReactEmailPreset`: `columnsBlock`, `headingBlock`,
+`textBlock`, `imageBlock`, `buttonBlock`, `dividerBlock`, `spacerBlock`,
+`htmlBlock`, `iconRowBlock`, `navBlock`
+
+`defineBlock`, `RichText` and the rest come from [`lekh`](/reference/lekh/).
+
+## Why it works this way
+
+`pickReactEmailPreset` is its own function, not `createReactEmailPreset` with
+an optional list. A function that can build every Block reaches every Block,
+and your bundler cannot tell that your call never takes that path. So it would
+ship them all, list or no list.

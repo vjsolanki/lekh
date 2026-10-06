@@ -1,0 +1,12 @@
+pnpm lint-staged
+
+# lint-staged only runs plain `oxlint`, which never loads tsgolint — so every
+# type-aware rule is silently absent from the commit gate. Run them here, over
+# the whole workspace rather than the staged files, because a type-aware rule
+# needs the whole program to say anything.
+#
+# The library is built first: the docs site resolves `lekh` through the types
+# in dist/, and a stale or missing dist turns every import into an error type
+# that the type-aware rules report as a fault in the docs site.
+pnpm --filter lekh build
+pnpm lint:types

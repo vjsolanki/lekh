@@ -1,0 +1,232 @@
+---
+title: Make a drag one undo step
+description: "Wire sliders, colour pickers and column grips so a whole drag undoes at once."
+---
+
+import { Code } from "@astrojs/starlight/components";
+import color from "../../../examples/drag/color.tsx?raw";
+import shownValue from "../../../examples/drag/shown-value.ts?raw";
+import slider from "../../../examples/drag/slider.tsx?raw";
+import linkedPadding from "../../../examples/drag/linked-padding.tsx?raw";
+import columnStrip from "../../../examples/drag/column-strip.tsx?raw";
+import previewPane from "../../../examples/drag/preview-pane.tsx?raw";
+
+## What you'll do
+
+Wire your Inspector's controls so the email follows a drag live. One press of
+undo then takes the whole drag back, and you save one patch per drag. The
+Inspector is the panel where your users edit the selected Block, one piece of
+the email such as a button.
+
+## The short version
+
+Every control already works if you call `set` on every change. The editor
+groups quick sets of one prop, so undo takes one press per drag.
+
+```tsx
+<input type="color" onChange={(event) => control.set(event.target.value)} />
+```
+
+To save one patch per drag as well, call `preview` on every move and `commit`
+when the drag ends. This needs a listener for the native `change` event:
+
+<Code code={color} lang="tsx" title="color.tsx" />
+
+The control reads the value being dragged with this hook:
+
+<Code code={shownValue} lang="ts" title="shown-value.ts" />
+
+## Options
+
+One option on `createEditor`:
+
+| Name            | Type     | Default | What it does                                                                                                   |
+| --------------- | -------- | ------- | -------------------------------------------------------------------------------------------------------------- |
+| `newGroupDelay` | `number` | `500`   | How long a pause, in milliseconds, ends a run of `set` calls on one prop. Same name as the rich-text editor's. |
+
+In tests, set it small so nothing waits half a second:
+
+```ts
+createEditor({ definitions, rootType: "email", newGroupDelay: 10 });
+```
+
+## In depth
+
+### A Pending Change is shown, not saved
+
+The Canvas is where the email is drawn as your users work.
+
+A Pending Change is a value your users are still dragging. The Canvas shows it.
+The Document, the JSON tree that holds the email, does not hold it until the
+drag commits.
+
+On commit it becomes one ordinary change. That is one Op, the record the editor
+sends for each change, plus one undo step and one call to your `subscribe`
+listeners.
+
+If your users press Escape instead, it is dropped. There is nothing to undo.
+
+### The three calls on every control
+
+A Control Descriptor is what `getControls()` returns for each editable prop.
+Every one has these, next to `set`:
+
+| Call             | Wire it to                               | What it does                                                       |
+| ---------------- | ---------------------------------------- | ------------------------------------------------------------------ |
+| `preview(value)` | The live event: `input`, `onValueChange` | Shows `value` on the Canvas. No Op, no undo step.                  |
+| `commit(value?)` | The end event: `change`, `onValueCommit` | Saves what was last previewed, or `value` if given. One undo step. |
+| `cancel()`       | Escape                                   | Drops the Pending Change. The Canvas goes back to the saved value. |
+
+`commit(value)` with nothing pending acts as `set(value)`. A drag that ends
+where it began saves nothing and leaves no undo step.
+
+During a drag, `control.value` stays the saved value. `subscribe` listeners do
+not fire, so your Inspector does not re-render on every move. So a control that
+follows the pointer reads `getPendingChange()`, as `useShownValue` above does.
+
+### A native colour input
+
+React's `onChange` is the native `input` event. It fires on every move of the
+picker, so it calls `preview`.
+
+The native `change` event fires when the picker lets go. React has no prop for
+it, so add a listener, as `color.tsx` does.
+
+Some browsers' colour pickers never fire `change`. Then the Pending Change
+stays open until your users do anything else, like click another Block. That
+commits it, so nothing is lost.
+
+### A Radix slider
+
+Radix calls `onValueChange` on every move and `onValueCommit` on release. Wire
+them to `preview` and `commit`.
+
+<Code code={slider} lang="tsx" title="slider.tsx" />
+
+Arrow keys need care. On each key press, Radix calls `onValueCommit` first and
+`onValueChange` second. So only preview while a pointer is down, and commit
+the release in `onPointerUp`.
+
+Each key press then calls `commit(value)` with nothing pending, which acts as
+`set(value)`. Ten quick presses become one undo step.
+
+Pass Radix the value from `useShownValue`, not `control.value`. The saved value
+does not move during a drag, so the thumb would not move either.
+
+### Several props at once
+
+A "link all sides" padding control changes four props together. Call
+`editor.setPendingChange` with the Block's id and all four props. They are one Pending Change on one Block. The commit saves four Ops as one undo
+step. `editor.commitPendingChange()` and `editor.cancelPendingChange()` end it.
+
+<Code code={linkedPadding} lang="tsx" title="linked-padding.tsx" />
+
+With a native range input, each arrow key fires `input` then `change`. So
+each key press is its own undo step here.
+
+Calling `editor.setPendingChange` again on the same Block replaces the props it holds,
+so a control can drop a side mid-drag. `setPendingChange` returns `false`, and shows
+nothing, for any value `set` would refuse. Both end calls return `false` when
+nothing is pending.
+
+### Column widths
+
+A row's columns share its width, so widening one narrows its neighbour.
+`editor.getDivision()` describes how the selected row is divided. It holds one
+`Share` per column, and each Share moves its own column.
+
+| Call              | What it does                                                            |
+| ----------------- | ----------------------------------------------------------------------- |
+| `preview(value)`  | Moves this column and its neighbour on the Canvas. Returns every width. |
+| `commit()`        | Saves both widths as one undo step.                                     |
+| `cancel()`        | Drops the drag.                                                         |
+| `widthsIf(value)` | Returns what every width would be. Shows nothing, saves nothing.        |
+| `set(value)`      | Saves at once.                                                          |
+
+<Code code={columnStrip} lang="tsx" title="column-strip.tsx" />
+
+All of these clamp the value to the row, so a grip dragged past the end stops
+there.
+
+### Your own preview pane
+
+`getDocument()` stays the saved Document during a drag. If you draw the email
+somewhere else as well, read `getDocumentWithPendingChange()` instead. A drag
+only tells pending listeners, so subscribe to both:
+
+<Code code={previewPane} lang="tsx" title="preview-pane.tsx" />
+
+With nothing pending, it returns the same object as `getDocument()`.
+
+:::caution
+Never save `getDocumentWithPendingChange()`. Your users may still press Escape.
+Save `getDocument()`, or the Ops from `onOp`.
+:::
+
+### Undo, and other actions mid-drag
+
+Only one Pending Change is ever open. Anything else your users do commits it
+first, as its own undo step: selecting a Block, inserting, deleting, switching
+Stage, setting another prop.
+
+A Stage is the desktop or phone view of the email. A drag on the phone Stage
+saves a phone-only value, as `set` does there.
+
+Undo counts too. `Mod+z` mid-drag commits the drag, then undoes it. So the
+Canvas lands on the old value, and `Mod+Shift+z` brings the dragged value back.
+
+Escape on the Canvas cancels a Pending Change before it stops text editing.
+The editor never listens for keys outside the Canvas. Handle Escape in your
+own controls with `cancel()`.
+
+### What the grouping does for `set`-only controls
+
+If you only call `set`, each move still sends its own Op. The editor groups
+them in its undo history instead. A `set` joins the one before it when both
+are on the same Block, prop and Stage, within `newGroupDelay` of each other.
+
+The grouped step undoes back to the value before the first `set`. A run that
+ends where it began leaves no undo step. Two runs with a pause between them
+stay two steps.
+
+Any other change breaks a run. So do undo, redo, a commit of a real Pending
+Change, and a collaborator's change to the same prop.
+
+### Working with collaborators
+
+Your users' Pending Change is theirs alone. Peers get the committed Op only.
+
+If a peer changes the same prop mid-drag, the drag keeps showing. On commit,
+the drag wins. Undo then goes back to the peer's value, not the value before
+the drag.
+
+If a peer deletes the Block, the Pending Change is dropped, and a later
+`commit` does nothing.
+
+## Common problems
+
+**Undo takes one press per move of the slider.** Your moves are further apart
+than `newGroupDelay`, or you preview on key presses with Radix. Wire `preview`
+and `commit`, and only preview while a pointer is down.
+
+**The Canvas does not move until release.** You hold a local draft and call
+`set` on release. Call `preview` on every move instead.
+
+**The thumb snaps back while dragging.** You pass `control.value` to the
+input. It stays the saved value until commit. Read the dragged value first.
+
+**The colour never saves.** Nothing calls `commit`. Add a listener for the
+native `change` event. React's `onChange` is the `input` event.
+
+**My saved email has a value that was cancelled.** You save
+`getDocumentWithPendingChange()`. Save `getDocument()` or the Op stream.
+
+**My Inspector shows the old value during a drag.** That is expected:
+`control.value` is the saved value. Use `useShownValue` for a live label.
+
+## Why it works this way
+
+A drag fires about a hundred values. Keeping them out of the Document keeps the
+Op stream a true list of edits, so a cancel leaves nothing behind.
+
+Read [The op log and undo](/why/op-log/).

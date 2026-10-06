@@ -1,0 +1,164 @@
+---
+title: Type your Blocks properly
+description: "Where the types flow on their own, where they stop, and what to do at the seams."
+---
+
+import { Code } from "@astrojs/starlight/components";
+import block from "../../../examples/typed-block.tsx?raw";
+import controls from "../../../examples/typed-controls.tsx?raw";
+
+## What you'll do
+
+Get inference through a Block Definition, and handle the three places the
+library hands you `unknown` on purpose.
+
+## The short version
+
+Pass your props to `defineBlock` and everything downstream follows.
+
+<Code code={block} lang="tsx" title="button.tsx" />
+
+## Options
+
+The three places a type stops, and what each one is protecting.
+
+| Where                                | Type                      | Why                                           |
+| ------------------------------------ | ------------------------- | --------------------------------------------- |
+| `ControlDescriptor.value`            | `unknown`                 | One panel serves every Block type at once.    |
+| `SchemaEntry.constraints`            | `Record<string, unknown>` | The library never reads them. They are yours. |
+| A `Migration`'s `props` and `mobile` | `Record<string, unknown>` | Written by older code, possibly years ago.    |
+
+## In depth
+
+### The Schema is exhaustive, and that is doing work
+
+`BlockSchema<TProps>` is a mapped type over your props:
+
+```ts
+type BlockSchema<TProps> = {
+  readonly [TKey in keyof TProps]-?: SchemaEntry<TProps[TKey]>;
+};
+```
+
+The `-?` strips optionality. Every key of `TProps` must have an entry, and each
+entry's `defaultValue` is typed by the prop it belongs to.
+
+Two useful consequences. Adding a prop to your type and forgetting the Schema
+is a compile error, not a control that silently never appears. And a
+`defaultValue` of the wrong type is caught where you wrote it, rather than
+becoming a value your `render` has to defend against.
+
+This is also why props have no optional keys. Every prop resolves to its
+default when nobody has set it, so inside `render` there is nothing to be
+`undefined`.
+
+### Why an interface will not compile
+
+`defineBlock<TProps>` constrains `TProps` to `Record<string, unknown>`. A type
+alias satisfies that. An interface does not, because an interface has no
+implicit index signature — TypeScript will not assume a future declaration
+merge cannot add a key of another type.
+
+```ts
+interface ButtonProps {
+  label: string;
+} // does not satisfy the constraint
+type ButtonProps = { label: string }; // does
+```
+
+The error names the constraint rather than the cause, so it is worth knowing
+before you meet it.
+
+### Narrow once, at the edge
+
+`ControlDescriptor.value` is `unknown`, and it has to be. A single inspector
+renders descriptors from every Block in the email, so there is no one type it
+could be.
+
+Casting compiles. It also lies the first time a migration changes a prop's type
+under an email saved two years ago — the exact case the `unknown` is there to
+make you think about.
+
+Narrowing in every control gets repetitive fast. Do it once per kind instead,
+and write each control against a real type:
+
+<Code code={controls} lang="tsx" title="controls.tsx" />
+
+`control` infers `TValue` from the reader you pass it, so the renderer below
+needs no annotation. Inside `text`, `value` is a `string`. Inside `number` it
+is a `number`.
+
+Assigning `descriptor.set` to `(value: TValue) => void` is safe in that
+direction: a function accepting `unknown` accepts anything, including a
+`TValue`. The reverse would not be.
+
+A registry also gives you the open-ended behaviour for free. A `kind` nothing
+claims draws nothing, so [adding your own control
+types](/guides/custom-controls/) means adding a key.
+
+### Constraints are yours, and the library never looks
+
+`constraints` is `Readonly<Record<string, unknown>>` and passes through
+untouched. `min`, `max` and `unit` are conventions the Preset follows, not an
+interface anything enforces.
+
+If you want them typed, that is your registry's job. Declare what your kinds
+take and read them through a helper that narrows, the way `numberOr` does
+above. Nothing stops you putting a whole configuration object in there.
+
+### Migrations get `unknown`, and should
+
+```ts
+type Migration = (stored: {
+  readonly props: Readonly<Record<string, unknown>>;
+  readonly mobile: Readonly<Record<string, unknown>> | undefined;
+}) => {
+  props: Record<string, unknown>;
+  mobile?: Record<string, unknown>;
+};
+```
+
+Untyped on both sides, deliberately. A migration's input was written by an
+older version of your own code, so typing it as today's props would be a claim
+you cannot support. Narrow every value you read:
+
+```ts
+const padding = typeof props["padding"] === "number" ? props["padding"] : 12;
+```
+
+See [Change a block after emails exist](/guides/migrations/).
+
+### Typing what you get back out
+
+`getDocument()` returns an `EmailDocument`, which is JSON: `Block` nodes with
+`props` typed as `Record<string, unknown>`. It is not generic over your
+Definitions, and could not be — a Document holds many Block types at once, and
+the whole point is that it can name a type you have not registered.
+
+Read props back through the Definition that owns them, or narrow at the point
+of use. `assetOf(value)` is the built-in example: it takes an `unknown` prop
+and gives you an `Asset` or `undefined`.
+
+## Common problems
+
+**`Type 'ButtonProps' does not satisfy the constraint 'Record<string, unknown>'`.**
+It is an interface. Make it a type alias.
+
+**A prop is missing from the Schema and TypeScript is quiet.** Your props type
+was inferred rather than passed. Write `defineBlock<ButtonProps>({ ... })`
+explicitly.
+
+**`props.thing` is possibly undefined inside `render`.** Your props type
+declared it optional. Props resolve to their Schema default, so nothing is
+optional — drop the `?`.
+
+**Casting `control.value` works until it does not.** It compiles against
+today's saved emails. Narrow instead, and give the failure a sensible fallback.
+
+## Why it works this way
+
+Every place the library hands you `unknown` is a place where it genuinely does
+not know, and saying so is the honest answer. A Document is data that outlives
+the code that wrote it, so anything read from one is a claim about the past.
+
+Read [Forgiving editor, strict render](/why/forgiving-editor/).

@@ -1,0 +1,224 @@
+---
+title: Validators
+description: "Three optional checks: text that is too small, text you cannot read, and links that go nowhere."
+---
+
+Three checks you can switch on. None runs unless you ask for it.
+
+All warn by default, so a check that misfires can never stop somebody sending
+an email.
+
+## Import
+
+```ts
+import { minimumContrast, minimumFontSize, workingLinks } from "lekh";
+
+const editor = createEditor({
+  definitions,
+  validators: [
+    minimumFontSize({ minimum: 14 }),
+    minimumContrast(),
+    workingLinks(),
+  ],
+});
+```
+
+Pass the same array to `renderDocument` if you want the check enforced at send
+time, or use `editor.getRenderOptions()`, which carries them for you.
+
+## minimumFontSize
+
+```ts
+function minimumFontSize(options?: MinimumFontSizeOptions): Validator;
+```
+
+Finds text too small to read comfortably, on desktop **and** on the mobile
+Stage.
+
+Mobile Overrides are checked too. That is where font sizes get shrunk, and a
+value only visible on a phone is the one least likely to be spotted.
+
+### Options
+
+| Option     | Type       | Default        | What it does                         |
+| ---------- | ---------- | -------------- | ------------------------------------ |
+| `minimum`  | `number`   | `12`           | Smallest acceptable size, in pixels. |
+| `severity` | `Severity` | `"warning"`    | Use `"error"` to block sending.      |
+| `props`    | `string[]` | `["fontSize"]` | Which props hold a font size.        |
+
+If your Blocks call it something else, say so instead of forking the check:
+
+```ts
+minimumFontSize({ props: ["fontSize", "captionSize"] });
+```
+
+### Code
+
+`ValidatorDiagnostic.fontSizeTooSmall`, which is `"font-size-too-small"`.
+
+## minimumContrast
+
+```ts
+function minimumContrast(options?: MinimumContrastOptions): Validator;
+```
+
+Finds text that disappears into its background: pale grey on white, or a
+heading that survived a change of section colour.
+
+It reads each text colour against the Surface really behind it. That is the
+Surface its Schema entry names with `on`. Without one, it is the nearest
+Surface beneath that is not `none`. A Surface is a colour something is painted on, like a Block's
+background or a button's fill. A Section's content colour is read before its
+outer band. See [What text is read against](/guides/custom-blocks/#what-text-is-read-against).
+
+It says nothing when a background image lies between the text and the Surface.
+
+### Options
+
+| Option      | Type       | Default     | What it does                        |
+| ----------- | ---------- | ----------- | ----------------------------------- |
+| `ratio`     | `number`   | `4.5`       | Smallest acceptable contrast ratio. |
+| `severity`  | `Severity` | `"warning"` | Use `"error"` to block sending.     |
+| `colorProp` | `string`   | `"color"`   | Which prop holds the text colour.   |
+
+`4.5` is the WCAG AA threshold for body text.
+
+### Code
+
+`ValidatorDiagnostic.contrastTooLow`, which is `"contrast-too-low"`.
+
+### What it says
+
+```
+Text is almost invisible.
+Button text is very hard to read.
+Heading text is hard to read.
+```
+
+The Block, and how bad it looks. Nothing else — no ratio, no hex values.
+
+A ratio tells an Author nothing on its own. Nobody can feel the difference
+between 1.2:1 and 3.5:1, and a panel holding twenty findings is scanned rather
+than read. Three bands do the same job in words: below 2:1 is almost invisible,
+below 3:1 is very hard to read, anything else short of your `ratio` is hard to
+read.
+
+If you want the numbers, key your own wording off `ValidatorDiagnostic.contrastTooLow` — that is
+what the code is for.
+
+### It comes with a fix
+
+Each finding carries a `Repair` that moves the **text** colour towards black or
+white, whichever moves it less, until it clears your `ratio`. Hand it to
+`editor.applyRepair` and the warning goes away.
+
+The text and never the background: a brand colour an Author chose for a Section
+is not something a warning about one line of copy should repaint.
+
+If neither black nor white would reach the ratio — a mid-grey background at
+AAA, say — you get the finding and no `Repair`, rather than one that lands
+short.
+
+### It stays quiet when it cannot be sure
+
+If it cannot read the background as a colour, it says **nothing at all** about
+the text in front of it. That covers a gradient, a CSS variable, a named
+colour, or anything partly transparent.
+
+That is the contract, not a gap. A check that guesses produces false warnings,
+people learn to ignore all warnings, and the check has made things worse.
+
+Silence means "could not tell", not "fine".
+
+## workingLinks
+
+```ts
+function workingLinks(options?: WorkingLinksOptions): Validator;
+```
+
+Finds links that go nowhere, or not where they were meant to. It reads every
+`url` prop as it is stored.
+
+| Code           | Value              | Catches                    | Fix                           |
+| -------------- | ------------------ | -------------------------- | ----------------------------- |
+| `urlEmpty`     | `"url-empty"`      | `https://`, `#`, `mailto:` | None                          |
+| `urlNoScheme`  | `"url-no-scheme"`  | `example.com`              | `https://example.com`         |
+| `urlBadScheme` | `"url-bad-scheme"` | `htps://`, `http:/`        | The same link with `https://` |
+
+Each code is on `ValidatorDiagnostic`. Each finding names the prop, so you can
+show it under the field. Hand a fix to `editor.applyRepair` and the warning goes
+away.
+
+### Options
+
+| Option     | Type       | Default     | What it does                    |
+| ---------- | ---------- | ----------- | ------------------------------- |
+| `severity` | `Severity` | `"warning"` | Use `"error"` to block sending. |
+
+### What passes
+
+`mailto:` and `tel:` links, relative links like `/terms`, `terms.html` or `#top`, and merge
+tags like `{{unsubscribe_url}}` or `*|ARCHIVE|*`. If it can't tell a link is
+wrong, it says nothing.
+
+It skips a blank link. An image with no link is fine. A button with no link
+already says so with its own warning.
+
+A link that could run script, like `javascript:`, is a `url-unsafe` error, and
+this check adds nothing to it. A misspelled scheme like `htps://` is both: the
+email leaves the link out, so it is `url-unsafe` too. Apply the
+`url-bad-scheme` fix and both go away.
+
+## Turning a warning into an error
+
+```ts
+createEditor({
+  definitions,
+  validators: [minimumFontSize()],
+  severities: { "font-size-too-small": "error" },
+});
+```
+
+Two ways to say the same thing: the `severity` option on the check, or a
+`severities` entry keyed by code. The `severities` map wins, and it also works
+for codes from Blocks you did not write.
+
+Severity only goes up. An error can never be softened into a warning.
+
+## Writing your own
+
+A Validator is a plain function. Nothing about the built-in three is special.
+
+```ts
+const noPlaceholders: Validator = (document, context) => {
+  // Walk document.root, return an array of Diagnostics.
+  return [];
+};
+```
+
+| Field      | Type       | Required | What it is                                 |
+| ---------- | ---------- | -------- | ------------------------------------------ |
+| `code`     | `string`   | Yes      | Stable id, so you can word it yourself.    |
+| `message`  | `string`   | Yes      | Fallback wording.                          |
+| `severity` | `Severity` | Yes      | `"warning"` or `"error"`.                  |
+| `blockId`  | `string`   | No       | The Block it concerns, if it concerns one. |
+| `prop`     | `string`   | No       | The prop on that Block, if it is one prop. |
+| `stage`    | `"mobile"` | No       | Only when the mobile value alone is wrong. |
+| `repair`   | `Repair`   | No       | What would put it right.                   |
+
+A check that belongs to one Block belongs on that Block instead. Block
+Definitions take their own `validate` function, and it travels with the Block.
+
+[Write your own checks](/guides/custom-validators/) has the whole of it: walking
+the tree, resolving a prop nobody set, picking a code, and attaching a fix.
+
+## Everything on this page
+
+Seven names, all exported from `lekh`:
+
+`minimumFontSize`, `MinimumFontSizeOptions`, `minimumContrast`,
+`MinimumContrastOptions`, `workingLinks`, `WorkingLinksOptions`,
+`ValidatorDiagnostic`
+
+The `Validator`, `Diagnostic` and `Severity` types are on the
+[`lekh`](/reference/lekh/) page.

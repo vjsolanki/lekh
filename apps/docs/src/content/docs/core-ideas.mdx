@@ -1,0 +1,149 @@
+---
+title: Core ideas
+description: "The Document, Blocks and Ops — the three things everything else is built on."
+---
+
+import Demo from "../../components/Demo.astro";
+
+Three ideas carry the whole library. Once you have these, the rest of the
+documentation reads quickly.
+
+## 1. The Document is the email
+
+A Document is a plain JSON tree. It is the email — the HTML you send is
+produced from it, and so is what you see on the canvas.
+
+```json
+{
+  "root": {
+    "id": "b1",
+    "type": "email",
+    "props": { "background": "#f4f4f5" },
+    "children": [
+      {
+        "id": "b2",
+        "type": "heading",
+        "props": { "text": "Hello", "size": 32 }
+      }
+    ]
+  }
+}
+```
+
+Nothing in it is a function, a class or a React element, so you can store it in
+any JSON column without writing a serialiser.
+
+Change the prop below and watch the markup change with it. There is no editor
+here at all — just a stored Document, your Block Definitions, and the render
+path, running in your browser.
+
+<Demo name="live-preview" />
+
+That is the whole relationship. The Document is the email; the markup is a
+function of it.
+
+Two things worth knowing:
+
+**The root is an ordinary Block.** Whole-email settings like background colour
+and content width are the root's props. There is no separate theme object.
+
+**`props` holds only what was actually set.** Anything missing falls back to the
+default in your Schema. That keeps saved emails small, and it means changing a
+default changes every email that never overrode it.
+
+## 2. A Block is data; a Block Definition is code
+
+A Block in the Document is four fields: an `id`, a `type`, its `props`, and
+`children` if it holds any.
+
+It carries no behaviour at all. What a `"heading"` looks like lives in the
+Block Definition you registered under that type: its Schema, its `render`, and
+what it may contain.
+
+That split is what makes emails last. You can restyle every heading you have
+ever saved by editing one `render` function, because the saved emails only ever
+said `"heading"`.
+
+It also means a Document can name a type you have not registered. The library
+reports that as a problem while editing and refuses to render it. Content
+somebody wrote is never quietly dropped.
+
+## 3. Every change is an Op
+
+Nothing edits the Document directly. Every change becomes one small record
+called an Op, and Ops are the only way it ever moves.
+
+There are five: set a prop, insert, remove, move, and a marker for a text edit.
+
+```json
+{
+  "kind": "set-prop",
+  "blockId": "b2",
+  "prop": "size",
+  "value": 32,
+  "previousValue": 28,
+  "origin": "local"
+}
+```
+
+Each one carries what it replaced. That is what makes undo work: to undo, the
+editor applies the reverse.
+
+Two things this buys you:
+
+**Save patches instead of whole emails.** Subscribe with
+`editor.onOp` and you get one small record per change. You do not
+have to re-save a large tree every time somebody nudges a font size.
+
+**Apply changes from elsewhere.** Ops carry an `origin` so you can tell your own
+edits from ones that arrived over a network.
+
+Undo works in **actions**, not in Ops. One thing a person did is one step back,
+however many Ops it took to carry out.
+
+## How you read it
+
+The editor holds the Document and never hands you a new one on every keystroke.
+It tells you something changed; you read what you need, when you need it.
+
+```ts
+editor.subscribe(() => {
+  // Something changed. Read whatever this part of your UI shows.
+});
+```
+
+This is why components in the [tutorial](/getting-started/) call a hook that
+returns nothing and then read the editor while rendering.
+
+## Problems are described, not enforced
+
+While someone is editing, the library never blocks them. Delete a required
+unsubscribe link and the delete succeeds. The email becomes invalid and says so,
+through a Diagnostic that often carries a one-click fix.
+
+The refusal happens at the end instead. Rendering throws on a real error, which
+is the one moment a promise about the finished email can be kept.
+
+Editing stays forgiving. Sending stays strict.
+
+## What the library does not do
+
+It draws none of your interface. Every pixel is yours. You get data and hooks,
+and you build the product around them.
+
+The trade is more work up front, in exchange for an editor that looks like your
+product instead of like a library.
+
+Read [Headless by design](/why/headless/).
+
+## What will not change
+
+lekh is not on npm yet, and the API can still move. Four things are decisions
+rather than implementation details, so they will not:
+
+- A Document stays plain JSON you can store anywhere.
+- Every change stays an Op, and undo stays action-shaped.
+- The library keeps drawing none of your interface.
+- Rendering keeps refusing an email with a real error in it.
+
+If any of those changed, it would be a different library.

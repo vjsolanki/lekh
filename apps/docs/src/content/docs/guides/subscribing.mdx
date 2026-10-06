@@ -1,0 +1,158 @@
+---
+title: Subscribe to changes efficiently
+description: "React to edits without re-rendering your whole app."
+---
+
+import { Code } from "@astrojs/starlight/components";
+import selector from "../../../examples/subscribe-selector.ts?raw";
+
+## What you'll do
+
+Keep your interface in step with the editor without re-rendering everything on
+every keystroke.
+
+## The short version
+
+The editor never hands you a new email. It tells you something changed, and you
+read what you need.
+
+`useEditorState` is that read. Say what you want, and your component re-renders
+when that changes and not otherwise.
+
+```tsx
+import { useEditorState } from "lekh/canvas";
+
+function StageToggle() {
+  const stage = useEditorState((editor) => editor.getStage());
+  // ...
+}
+```
+
+That is the whole subscription. There is no effect to write and nothing to
+remember to call — a component that reads is a component that is subscribed.
+
+It reads the editor from the surrounding `EditorProvider`, the same one the
+canvas and the palette use, so nothing is threaded through props.
+
+## Select the narrowest thing you need
+
+Every getter on `Editor` answers with the **same value until that value moves**.
+That stability is part of the interface, not an accident, so selecting a small
+thing buys you a component that holds still.
+
+```tsx
+const canUndo = useEditorState((editor) => editor.canUndo());
+```
+
+An undo button written this way does not re-render while an author types. It
+re-renders when undo becomes available and when it stops being available, which
+is twice in a long editing session.
+
+Call the hook once per thing you want. Two reads are two subscriptions:
+
+```tsx
+const canUndo = useEditorState((editor) => editor.canUndo());
+const canRedo = useEditorState((editor) => editor.canRedo());
+```
+
+Do not compose them into one selector. Returning `{ canUndo, canRedo }` builds a
+new object on every call, React sees a change that never settles, and it will
+tell you your snapshot should be cached.
+
+## The one read that cannot hold still
+
+Selecting the document re-renders on every keystroke, and no subscription
+primitive avoids that. A block's text lives on the block, so the root really is
+a new object each time it changes — see [The op log and undo](/why/op-log/).
+
+That is correct for an outline tree or a markup preview, which are showing the
+document. It is the wrong read for a toolbar. If you find yourself selecting the
+document to answer a small question, there is usually a getter for the question:
+
+| You want                        | Select this          |
+| ------------------------------- | -------------------- |
+| Whether undo is available       | `canUndo()`          |
+| Which block is selected         | `getSelection()`     |
+| Which block is being typed into | `getEditing()`       |
+| The desktop or mobile stage     | `getStage()`         |
+| What an inspector shows         | `getControls()`      |
+| What is wrong with the email    | `getDiagnostics()`   |
+| Images still resolving          | `getImageRequests()` |
+
+## Outside the provider
+
+`useEditorState` needs an `EditorProvider` above it. If you are driving the
+editor without one — a headless inspector, a test, a server-rendered summary —
+the same hook is four lines over the editor you already hold:
+
+<Code code={selector} lang="ts" title="subscribe-selector.ts" />
+
+## The three subscriptions
+
+`useEditorState` is built on the first of these. The other two have no hook,
+because they are not about rendering.
+
+| Method      | Fires                                     | Use it for                                     |
+| ----------- | ----------------------------------------- | ---------------------------------------------- |
+| `subscribe` | Once per action, after everything settles | Re-rendering your interface.                   |
+| `onOp`      | Once per Op, in order                     | Saving patches.                                |
+| `onReveal`  | When a Block should scroll into view      | Reacting to it. The canvas does the scrolling. |
+
+All three return a function that unsubscribes.
+
+The names tell you which kind you have. A `subscribe…` method says state
+changed, so you can hand it to `useSyncExternalStore`. An `on…` method hands
+you an event. Don't pass it to `useSyncExternalStore`.
+
+**`subscribe` fires once per action**, however many Ops it took. An image
+landing is an insert, a selection and a request leaving the list. You are told
+once, when all three are done, and never in between.
+
+**`onOp` fires per Op**, and runs _before_ the change listeners for
+the same action. So your patch is written before anything reacts to the state
+it produced.
+
+## Scrolling to a Block
+
+You do not need this one for scrolling. The canvas answers `reveal` itself —
+see [Give the canvas a height](/guides/canvas-scrolling/).
+
+Subscribe when you want to know a reveal happened and do something else with
+it: flash a highlight, move focus, expand a tree row. It fires before your
+framework has painted, so the Block may not be on the page yet — wait a frame
+before looking it up.
+
+```ts
+editor.onReveal((blockId) => {
+  requestAnimationFrame(() => highlight(blockId));
+});
+```
+
+## Common problems
+
+**React throws "getSnapshot should be cached".** Your selector is building the
+value it returns — composing two getters into an object or array, or mapping one
+into a new shape. Select the getter itself and do the shaping afterwards, or
+call the hook twice.
+
+**Nothing re-renders.** You read the editor outside a selector — in a `useMemo`,
+an event handler, or a value captured on mount. Only what you select is
+subscribed.
+
+**One component re-renders on every keystroke.** Check what it selects. If it is
+the document, that is the design; if it is not, it is reading something wider
+than it needs.
+
+**Your patch save runs before the change.** That is correct.
+`onOp` runs first by design. Read the editor inside `subscribe`
+instead if you need settled state.
+
+## Why it works this way
+
+Handing back a fresh email on every keystroke would mean copying the whole tree
+for a font-size nudge, and you would still have to work out what changed.
+
+Telling you _that_ something changed and letting you select what you care about
+is cheaper. It is also what makes patch-saving possible.
+
+Read [The op log and undo](/why/op-log/).

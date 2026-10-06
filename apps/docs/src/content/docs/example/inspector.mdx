@@ -1,0 +1,192 @@
+---
+title: "The example: the inspector"
+description: "The biggest file in the example, and the honest reason why. What the library describes, and what a panel still has to decide."
+---
+
+`src/components/editor/inspector.tsx` — the largest file in the example by
+some distance.
+
+## Why it is the big one
+
+Not because the API is awkward. Because a control is a real piece of interface,
+and this file contains eight of them.
+
+The library's side of the contract is one method:
+
+```ts
+editor.getControls(): readonly ControlDescriptor[]
+```
+
+That returns plain data — `name`, `kind`, `label`, `value`, `constraints`,
+`group`, `overridable`, `origin`, `otherStage`, `set`, `clearOverride`. No React, no
+form, no layout. Turning each descriptor into something somebody can use is the
+entire job, and it is the job you took on when you chose a headless library.
+
+## What the library gave it
+
+| From the library                      | What it answers                                        |
+| ------------------------------------- | ------------------------------------------------------ |
+| `getControls()`                       | The selected Block's props, or the root's if none.     |
+| `getEditableChildren()`               | Structural children, each with their own props.        |
+| `getAddableChildren()`                | Structural types this Block can gain, each with `add`. |
+| `getStage()`                          | Which Stage the values belong to.                      |
+| `setPendingChange(blockId, props)`    | Several sides of a Box moved as one undo step.         |
+| `clearMobileOverride(blockId, props)` | Every side's phone-only value dropped at once.         |
+| `replaceImage(blockId)`               | Raise an image request for a Block already placed.     |
+| `getSelectable(blockId)`              | Which Block a click should actually select.            |
+
+## What had to be written
+
+**Eight controls, one per `kind`.** `align`, `asset`, `boolean`, `color`,
+`number`, `rich-text`, `select`, `width`. Each is a component in your design
+system, and each is where the bulk of the line count sits.
+
+`kind` is an open string the library never interprets, so this switch is the
+only place that decides what `"align"` means. A kind nothing handles returns
+`null`, which is what lets you ship a new prop type without touching anything
+else first.
+
+**The header and the type.** The header names the Block and, under it, the
+path back to the email. Each step of the path selects that Block. It shows no
+type name, because "columns" is a word for code.
+
+Each row's label is small and grey, and its value is a size up in full ink, so
+the eye lands on what is set. Mono type means a value you can type or measure,
+like 24px, #1a1a1a or 50%. Names, such as a Block's label or a mail client, are
+in the body face.
+
+Small green text uses its own token, `--ink-mark`. It is a darker green than
+`--primary` in light mode and a lighter one in dark mode, so thin text stays
+readable. Fills, rings and icons keep `--primary`.
+
+**Origin marks.** `origin` and `otherStage` are data. What they look like is
+a design decision.
+
+The example puts a small mark beside the label of each row that isn't at its
+default. A row at its default shows nothing.
+
+A dot means the value is set on this block. A link means it follows the email.
+A phone chip with a value means phones show something else.
+
+The phone chip shows for a phone-only value, and on desktop for a row whose
+mobile value differs. Each mark is a shape as well as a colour. A Box gets one
+set of marks for all its sides.
+
+The marks are worked out in `origin-marks.ts`. Clicking one opens a popover
+that says where the value comes from. On mobile it names the desktop value,
+and on desktop the mobile value when mobile differs.
+
+Clicking that value switches Stage. Each reset says where it leads.
+
+"Use desktop, 30" drops the phone-only value. "Use email color" puts a Block
+back on the email's. "Reset to default" shows
+whenever the value isn't the default.
+
+**The contrast meter.** While someone drags a colour, a small chip beside it
+shows the text on what is behind it, and the ratio. Below 4.5:1 it turns to a
+warning. The ratio is the example's own maths from `against`. The warning under
+the field comes from the saved Document, so it catches up when the drag ends.
+
+**Mail Client Notes.** Some values look different in some mail clients. The
+example draws each note in `clients` as a grey line under its field. A rounded
+button's corner radius says "Classic Outlook for Windows: Shows square corners". The
+line sits apart from the problems below it, because nothing is wrong.
+
+Show on gets notes only when it is set to mobile. They name the phone readers
+that never show the Block, because they strip the styles that reveal it.
+
+**The Box control.** Controls that share a `box` are drawn as one control
+with four sides. A button has two: its padding and its inner padding. Arrow
+keys step 1, and 8 with Shift.
+
+The lock shows locked when every side matches. Nothing stores it. While locked,
+changing one side changes them all. Hold ⌥ to change one side alone. Locking an
+uneven Box gives every side the value of the side you touched last, or the top.
+That is one undo step, so undo shows it unlocked again. On mobile, "Use desktop"
+drops every side's phone-only value at once.
+
+**Grips on the canvas.** The selected Block shows a grip in the middle of each
+side of each Box. Drag one to change that side. A button's outer grips move its
+padding, and the grips by its label move its inner padding. A drag is one undo
+step, and Escape puts it back. A locked Box moves every side together. Hold ⌥
+to move one side alone. The grips live in `chrome.tsx`, as the `boxEdges` Slot.
+
+**The mobile frame.** On mobile the email sits in a green frame with a label,
+so nobody forgets that every change there is phone-only.
+
+On mobile the Inspector shows only the rows that can differ on phones. A banner
+says "Editing for phones. Other settings are the same on all screens.", or
+"This block looks the same on phones." when nothing can differ.
+
+**Grouping.** Descriptors arrive in Schema order carrying an optional `group`
+name. Whether a group is a heading, a tab or a fieldset is yours. The example
+walks the list once and starts a new section when the name changes.
+
+**Folding.** A descriptor with `advanced: true` is a setting people rarely
+need. If a group holds only those, the whole group is one closed fold under its
+name. If it mixes both, the advanced ones go last, in a fold called "More". The
+example remembers which folds you opened, so "More" stays open on the next
+Block.
+
+A problem in a folded field opens the fold when you jump to it. A closed fold
+names what is set inside it, such as "More · Border width 2px". The summary is
+built in `fold-summary.ts`.
+
+**Finding a setting.** A Block with eight settings or more gets a "Find a
+setting" box. It matches labels, group names and Box names, folded ones too,
+and opens each fold that holds a match. Escape empties it. Selecting another
+Block starts it empty.
+
+**Short selects.** A select with two to four options, each a few characters,
+is a row of buttons, so you see every choice at once. Heading level is H1, H2,
+H3. Anything longer stays a dropdown.
+
+`select-shape.ts` picks buttons or a dropdown. A stored value the options don't
+list shows as "Custom" under the buttons, with none pressed.
+
+**Show on.** A select whose options are all `all`, `desktop` or `mobile` is
+drawn through the same buttons, as icons: both devices, the desktop, the phone.
+The Schema's labels are the tooltips. A column can't be mobile only, so it gets
+two icons. Its label is "Show this column on", because it sits in the Columns
+Block's panel.
+
+**Suggestions in the fields.** A Suggestion is a change the agent proposes,
+shown but not stored until it is accepted. When one touches the selected Block,
+a card at the top of the Inspector gives its reason, Accept and Reject. Accept
+says how many changes it takes, such as "Accept 3 changes".
+
+Each field it changes gets a line under it: the stored value struck through,
+then the new one in green. Both are read from `suggested` on the descriptor,
+so a phone-only change shows only on the mobile Stage.
+
+Hold "Original", or hold ⌥, to see the email without the Suggestion. The
+editor passes its id to the Canvas as `showOriginal` while you hold. Nothing is
+stored. ⌥ is ignored while you type or drag, where it means something else.
+The card is in `suggestion-card.tsx`.
+
+**The `rich-text` non-control.** It renders a hint saying the prop is edited on
+the email itself, not an input. Two write paths for one prop would be two
+sources of truth, and the Text Engine already owns that one.
+
+**Structural children.** A column cannot be selected directly, so the row's
+panel is where each column's width, background and padding live, along with
+**Add column** and a delete for each. That whole section exists because
+`structural: true` deliberately puts those Blocks out of reach.
+
+The picked column's settings are one fold, closed when you select the row. It
+is summed up like any other: "Column 1 of 2 · Padding 20px". Picking a column
+in the strip opens it.
+
+## Worth stealing
+
+The three describing methods — `getControls`, `getEditableChildren`,
+`getAddableChildren` — are shaped alike on purpose. One panel pattern renders
+all three, which is why the file is long rather than complicated.
+
+## Worth knowing before you copy it
+
+Most of it is the eight controls. If your Blocks use three kinds,
+you write three. The scaffolding around them is a few hundred lines at most.
+
+See [Build an inspector](/guides/inspector/) and [Add your own control
+types](/guides/custom-controls/).

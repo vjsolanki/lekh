@@ -1,0 +1,329 @@
+---
+title: Write your own Block
+description: "Define a Block of your own, and make one that cannot be deleted."
+---
+
+import { Code } from "@astrojs/starlight/components";
+import block from "../../../examples/custom-block.tsx?raw";
+import scratch from "../../../examples/custom-blocks-from-scratch.tsx?raw";
+import mixing from "../../../examples/preset-plus-your-block.ts?raw";
+
+## What you'll do
+
+Describe a new kind of Block, its editable props and how it draws, then mark it
+required so every email has to carry one.
+
+## The short version
+
+A Block Definition is the registered description of one kind of Block. Declare
+it with `defineBlock` and pass it to `createEditor`.
+
+<Code code={block} lang="tsx" title="custom-block.tsx" />
+
+Nothing self-registers. A Definition you never pass to `createEditor` is a
+Definition your bundler can drop.
+
+## An editor made only of your own Blocks
+
+The [tutorial](/getting-started/) composed the Preset. Nothing obliges you to.
+Three Definitions is enough for an editor that works: a root to hold
+everything, and two things to put in it.
+
+<Code code={scratch} lang="tsx" title="blocks.tsx" />
+
+Swap it into the tutorial's `definitions.ts` and every other file stays as it
+was:
+
+```ts
+export const definitions = [email, heading, paragraph];
+export const rootType = "email";
+```
+
+Three things to notice.
+
+`schema` is the list of props someone may edit. Each entry has a `kind`, which
+is a string **you** choose. The library never interprets it. `"color"` means
+whatever your inspector decides it means, which is why [adding your own control
+types](/guides/custom-controls/) needs no cooperation from the library.
+
+`accepts` turns a Block into a container. A Block without it is a leaf, which
+is the common case and needs no configuration.
+
+`render` returns ordinary React. It runs on the canvas and again when you
+produce the final HTML, so you write it once, and the two can never drift. What
+it returns has to be markup a mail client will accept — which is why the
+example is tables and inline styles rather than a `div` and a stylesheet. See
+[Make emails work on phones](/guides/responsive/) for why.
+
+These Blocks use plain `kind: "text"` props rather than `rich-text`, so they
+need no Text Engine at all. Drop the three Tiptap packages if you go this way
+and nothing else changes.
+
+### Mixing the two
+
+The Preset is an array, so composing is a spread:
+
+```ts
+const definitions = [...createReactEmailPreset(), callout];
+```
+
+Run that and your Block is registered, appears in the palette, and cannot be
+dropped anywhere.
+
+`accepts` is an explicit list of types, not a wildcard. A Preset written before
+your Block existed has no way to name it, so every container refuses it. That
+refusal is the same machinery that stops a column landing inside a column, and
+it does not have an exception for Blocks you like.
+
+Extend the containers on the way past:
+
+<Code code={mixing} lang="ts" title="definitions.ts" />
+
+Widen only what you mean to widen. Passing every type to every container gets
+you an editor where a heading can go inside a heading.
+
+## Making a Block required
+
+Two independent flags, and most Blocks want neither.
+
+`required: true` means every email must contain at least one. New emails are
+seeded with one of each, so they start valid. If one goes missing, validation
+raises an error-severity Diagnostic carrying a repair that puts it back.
+
+`deletable: false` refuses a direct delete. Your chrome can read it and show a
+padlock where the bin would be:
+
+```tsx
+const locked = editor.getDefinition(block.type)?.deletable === false;
+```
+
+The two are separate on purpose. A required Block that stays deletable is fine,
+because losing it is a problem your users can see and fix. A non-deletable
+Block that is not required is fine too.
+
+**Deleting a Section that holds a required Block still works.** Refusing would
+make redesigning a footer impossible. The email becomes invalid instead and
+says so, with a one-click repair. See
+[Forgiving editor, strict render](/why/forgiving-editor/).
+
+Nothing here is privileged. The unsubscribe link ships with these same two
+flags and no others — see
+[Add unsubscribe and a postal address](/guides/compliance/).
+
+To build a whole footer this way, with your own error and warning codes, see
+[Build a compliance footer of your own](/guides/custom-compliance/).
+
+## Values nobody should edit
+
+There is no per-prop lock. Every prop in a Schema gets a control, and every
+control can be set.
+
+Keep the fixed value out of the Schema instead. Capture it in the function that
+builds the Definition, the way the example's `url` is captured:
+
+```ts
+export function preferencesLink(config: { url: string }) {
+  return defineBlock({/* ... render reads config.url ... */});
+}
+```
+
+No Schema entry means no control, so it never reaches your inspector. It also
+never reaches the saved email, which is what you want for anything that changes
+per account or per environment.
+
+Use this for API keys, tracking parameters and tenant URLs: anything that
+belongs to your product rather than to the email.
+
+## Colours that follow the email
+
+A Schema entry can follow a prop on the root Block, the one at the top of every
+email. Add `follows` with the root prop's name:
+
+```ts
+color: {
+  kind: "color",
+  label: "Color",
+  follows: "textColor",
+  defaultValue: "#333333",
+},
+```
+
+When the Block stores no value, it takes the root's. When the root has none, or
+has one that is not a usable colour, it takes `defaultValue`. A colour set on the
+Block always wins. Setting it back to `undefined` makes it follow again.
+
+`follows` reads the root only. It never reads a parent or any other Block above,
+because a Block that reads its parent changes when someone moves it. The root is
+the one Block above every other, wherever it sits.
+
+`follows` is for colours. A root value counts as usable when it is a hex or
+`rgb()` colour with no transparency.
+
+## What text is read against
+
+The contrast check in [Validators](/reference/validators/#minimumcontrast)
+reads each text colour against the Surface behind it. A Surface is a colour
+something is painted on, declared with `kind: "surface-color"`, like a Block's
+background or a button's fill.
+
+By default that is the nearest Surface beneath the text that is not `none`. A
+Block's Surfaces stack in Schema order, the last one on top, and sit above its
+parent's. An optional image declared after a Surface lies over it.
+
+When the text sits on one Surface in particular, name it with `on`:
+
+```ts
+backgroundColor: { kind: "surface-color", label: "Fill", defaultValue: "#111111" },
+color: { kind: "color", label: "Text color", defaultValue: "#ffffff", on: "backgroundColor" },
+```
+
+`on` must name a Surface on the same Block, or `defineBlock` throws. If that
+Surface is `none`, the check looks beneath it.
+
+## Options
+
+The flags this guide is about:
+
+| Field       | Type      | Default | What it does                                                                  |
+| ----------- | --------- | ------- | ----------------------------------------------------------------------------- |
+| `required`  | `boolean` | `false` | Every email must contain at least one, and new emails are seeded with one.    |
+| `deletable` | `boolean` | `true`  | `false` refuses a direct delete. Deleting a parent that holds it still works. |
+
+Every other field a Block Definition takes is in
+[the `lekh` reference](/reference/lekh/#defineblock): `accepts`, `maxChildren`,
+`minChildren`, `structural`, `version`, `migrations` and `validate`.
+
+A migration gets the stored Block's `props` and its phone-only values,
+`mobile`, and returns both:
+
+```ts
+migrations: {
+  1: ({ props, mobile }) => ({ props: { ...props, label: props["text"] }, mobile }),
+},
+```
+
+Leave `mobile` out of what it returns and the Block loses its phone-only
+values. See [Change a block after emails exist](/guides/migrations/).
+
+## In depth
+
+### What your render may emit
+
+Nothing rewrites your markup. `toHtml(element)` is
+`renderToStaticMarkup` with an XHTML 1.0 Transitional doctype in front of it.
+There is no CSS inliner, no table wrapper, no post-processing step. What your
+Definition returns is what lands in somebody's inbox.
+
+So a Block Definition is not a React component that happens to be used for
+email. It is email markup that happens to be written in React.
+
+**Tables carry layout.** Outlook on Windows, from 2007 onwards, renders HTML
+with Microsoft Word's engine rather than a browser engine. It has no `float`,
+no `position`, no flexbox and no grid. A `<div>`-based layout does not degrade
+there — it collapses into a single stack. Nested tables with `role="presentation"`
+are what survives, which is why the Preset's containers are tables.
+
+**Styles go inline.** Put a declaration in the element's `style` attribute,
+which is what React's `style` prop already produces. Some clients strip a
+`<style>` block entirely, so anything load-bearing that lives only in a
+stylesheet is a rendering that some readers never get.
+
+**Which is why mobile behaviour is the exception.** Mobile Overrides have to
+live in a `<style>` block, because a media query cannot be inlined. That is the
+trade the library makes deliberately: desktop values are inline and mobile
+values are in the head, so a client that drops the stylesheet still renders the
+desktop email correctly rather than rendering nothing. Degrading to the wide
+layout is a worse email. Degrading to no layout is not an email.
+
+**Showing a Block only on a phone takes a wrapper.** Hiding one on a phone is a
+class: `mobile.use("hide")`. Showing one only on a phone is the reverse, so pass
+what you render to `mobile.only(element)` instead. The library wraps it in a
+hidden `<div>` that the media query shows, and keeps it out of Outlook on the
+desktop. It is the one place your markup goes through a string before it
+reaches the email. Where the `<style>` is stripped it is never seen, so pair it
+with a desktop-only copy. See
+[Show a Block only on a phone](/guides/responsive/#show-a-block-only-on-a-phone).
+
+**Give tables a `width` attribute as well as a CSS width.** The Word engine
+reads the attribute. `max-width` it ignores entirely, so a layout whose only
+constraint is `max-width` is full-bleed in Outlook.
+
+**Images need `display: block`, an explicit `width`, and `alt` text.** Without
+`display: block` you get the gap under the image that comes from its baseline
+sitting on the line box. Many clients block images by default, so the `alt`
+text is the email for a meaningful share of your readers.
+
+**Padding goes on a `<td>`.** A cell is what every client pads. react.email's
+`Section`, `Container` and `Row` put `style` on the `<table>`, so pad a `Column`.
+
+Put the phone-only class, `mobile.className`, on that same `<td>`. Then a
+phone-only padding replaces the inline one. On an element further out, it adds
+to it.
+
+**Stay on `px`.** Support for `rem` and `em` is uneven, and there is no root
+font size you can rely on. One exception works: `font-size: 1em` on an element
+sized by its own cell, which is how the Preset's text sizes its paragraphs.
+
+**Text that holds paragraphs goes in a cell, not a `<p>`.** Add
+`constraints: { paragraphs: true }` to the rich-text prop, and `RichText`
+writes one `<p>` per paragraph. Pass `paragraphStyle` to style each one. Write
+the font and colour on every `<p>`, because some clients reset a paragraph's
+own. Put the phone-only class, the padding and the background on the cell, so
+one override reaches every paragraph. See
+[Let people type formatted text](/guides/rich-text/#paragraphs).
+
+### Markup your users write by hand
+
+Give a prop `kind: "html"` and the library treats it as markup your users wrote.
+The editor stores it as written. The library cleans it before your `render`
+sees it. Unsafe tags, attributes and URLs are gone, and every `<style>` rule is
+scoped to one class.
+
+Put that class, `htmlScopeOf(block.id)`, on the element round the markup.
+Insert the markup with `dangerouslySetInnerHTML`.
+
+The library cleans and checks any prop of the kind, on any Block. It cleans the
+same way in the Canvas and in the email, and warnings report what it changed.
+See [The html Block](/reference/blocks/#the-html-block) for what is kept.
+
+### Testing what it emits
+
+`renderDocument` is a pure function of a Document and your Definitions, so
+asserting on the output needs no browser and no editor:
+
+```ts
+const html = toHtml(renderDocument(document, { definitions }));
+expect(html).toContain('role="presentation"');
+```
+
+That is worth doing for the properties above rather than for the whole string.
+A snapshot of an entire email fails every time somebody changes a colour, and
+gets updated without being read.
+
+## Common problems
+
+**`EditorConfigurationError` on startup.** Your root type does not accept a
+required Block, or its `maxChildren` is lower than the number of required
+Blocks. Every required Block has to be placeable at the root, because that is
+where a repair puts it back.
+
+**The delete key still removes it.** `deletable: false` is on a different
+Definition than the Block you are selecting, or your chrome calls something
+other than `removeBlock`.
+
+**Your validator fires on a prop nobody has set.** An unset prop is not an
+empty one — it resolves to the Schema default. Compare against that default
+before deciding a value is missing.
+
+**The value is right in the panel but wrong in the email.** Your `render` reads
+`block.props` directly instead of the resolved `props` it is given. Use the
+`props` argument.
+
+## Why it works this way
+
+A Block you can require but not privilege is what keeps compliance out of the
+library's core. The unsubscribe link is not a special case in the code. It is
+two flags any Definition can set, which is why you can write a different footer
+and get the same guarantees.
+
+Read [Headless by design](/why/headless/).

@@ -1,0 +1,136 @@
+---
+title: Save and load a document
+description: "Store an email in your database and open it again."
+---
+
+import { Code } from "@astrojs/starlight/components";
+import patches from "../../../examples/save-patches.ts?raw";
+
+## What you'll do
+
+Put an email in your database, get it back out, and keep it saved as somebody
+works.
+
+## The short version
+
+An email is a plain JSON object. There is no serialiser to write and no custom
+column type.
+
+```ts
+const json = editor.getDocument(); // save this
+const editor = createEditor({ definitions, rootType: "email", document: json });
+```
+
+That is the whole story. Everything below is about _when_ to save.
+
+## Where to put it
+
+A `jsonb` column in Postgres, a document in Mongo, a blob in S3: anything that
+holds JSON.
+
+Store it whole. Do not spread Blocks across tables: the tree is the unit that
+has to stay consistent, and taking it apart buys you nothing you can query
+reliably anyway.
+
+Keep these alongside it, in ordinary columns:
+
+- **A name**, so people can find it.
+- **An updated timestamp**, for your own list screens.
+- **A schema version of your own**, if you ever want to know which release of
+  your Blocks wrote it. The library does not need this, since migrations live
+  per Block, but it helps when debugging.
+
+## Creating one before anybody opens it
+
+You do not need an editor to make an empty email.
+
+```ts
+import { createDocument } from "lekh";
+
+const blank = createDocument({ definitions, rootType: "email" });
+```
+
+It comes seeded with one of each Required Block, so it is valid from the moment
+it is created.
+
+## Saving as somebody works
+
+Two approaches. Pick by how big your emails get.
+
+<Code code={patches} lang="ts" title="save-patches.ts" />
+
+### Whole email, debounced
+
+`saveWhenIdle` above. Simple, and right for most products.
+
+`subscribe` fires once per action, not once per keystroke, so even without the
+debounce you would not be saving per character. The two seconds is about
+network calls, not correctness.
+
+### One patch per change
+
+`saveEveryChange` above. Each Op is small, a changed prop or an inserted Block,
+so the write stays the same size whether the email has five Blocks or five
+hundred.
+
+Append them and you can rebuild the email by replaying from the start. You get
+an edit history for free, which is what you want if you ever add "who changed
+this?".
+
+Keep a full snapshot every so often too, so replay does not get slower forever.
+
+## Loading an old email
+
+Pass it as `document` and the library brings it forward as it loads, running
+any migrations your Block Definitions declare.
+
+```ts
+const editor = createEditor({ definitions, document: saved });
+```
+
+`rootType` is optional here, because it is taken from the email itself.
+
+You never render an out-of-date shape. See
+[Change a block after emails exist](/guides/migrations/).
+
+## Two people at once
+
+`applyExternalOps` applies changes from somewhere else. They do not enter the
+local undo stack, so nobody can undo somebody else's work.
+
+```ts
+editor.applyExternalOps(incoming);
+```
+
+Conflicts resolve last-write-wins, in the order Ops arrive.
+
+Undo leaves a colleague's later edit alone. Say your user sets a heading red,
+then a colleague sets it blue. Undo keeps it blue, and steps back to the action
+before. A Block the colleague removed stays removed through undo and redo.
+
+Every Op carries an `origin`, which is `"local"` for yours unless you set it.
+Filter on it so you do not apply your own edits back to yourself.
+
+This is enough for "two people editing, occasionally". It is not a full
+collaborative editing system, and there is no cursor sharing.
+
+## Common problems
+
+**The email loads but blocks look wrong.** Your Block Definitions changed shape
+without a migration. See [Change a block after emails exist](/guides/migrations/).
+
+**Rendering throws after loading.** The saved email names a Block type you no
+longer compose in. Either keep the Definition around or migrate the email.
+
+**Saving feels laggy on big emails.** You are saving the whole tree per change.
+Switch to patches.
+
+**Undo undoes somebody else's change.** You applied their Ops with the normal
+methods instead of `applyExternalOps`.
+
+## Why it works this way
+
+The email is plain data, so it outlives whichever version of your code wrote
+it, and it can be read by a send job that never loads an editor.
+
+Read [The op log and undo](/why/op-log/).

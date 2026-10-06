@@ -1,0 +1,129 @@
+---
+title: lekh/tiptap
+description: "The text engine that ships, built on Tiptap."
+---
+
+Lets people type formatted text directly on the canvas: bold, italic, links and
+lists.
+
+A Text Engine is pluggable. The library defines the interface; this entry point
+is one implementation of it, kept behind its own import so nobody who supplies
+their own pays for it.
+
+:::caution[Experimental]
+This is the least settled entry point. It sits on a peer dependency with its own
+release pace. Read it before you rely on it, and be ready to write your own
+`TextEngine` and `EditableText` instead. Nothing in the core knows Tiptap
+exists, so that is a supported path rather than a fork.
+:::
+
+![Gzipped size of lekh/tiptap](https://img.shields.io/endpoint?url=https%3A%2F%2Fgist.githubusercontent.com%2Fvjsolanki%2F5d00f9ab6617974fe2b6a95b643ce5b7%2Fraw%2Flekh-tiptap.json)
+
+## Import
+
+```ts
+import { createTiptapTextEngine } from "lekh/tiptap";
+```
+
+`@tiptap/core`, `@tiptap/pm` and `@tiptap/starter-kit` are optional peer
+dependencies. Install all three if you import this.
+
+## createTiptapTextEngine
+
+```ts
+function createTiptapTextEngine(
+  options?: TiptapTextEngineOptions,
+): TiptapTextEngine;
+```
+
+### Options
+
+| Option          | Type     | Default | What it does                             |
+| --------------- | -------- | ------- | ---------------------------------------- |
+| `newGroupDelay` | `number` | `500`   | Pause in ms that ends a chunk of typing. |
+| `depth`         | `number` | `100`   | How many undo steps each Block keeps.    |
+
+`newGroupDelay` is what decides whether one ⌘Z takes back a word or a whole
+sentence. Longer means bigger chunks.
+
+## Wire it in two places
+
+The engine has two halves, driven by two different things. The editor drives
+history; the canvas mounts the editable text. So it goes in twice.
+
+```tsx
+const text = createTiptapTextEngine();
+
+const editor = createEditor({ definitions, rootType, textEngine: text });
+
+<EditorProvider editor={editor} editableText={text.EditableText}>
+  <Canvas slots={{ textToolbar: MyToolbar }} />
+</EditorProvider>;
+```
+
+Miss the second one and text still draws, but it cannot be typed into.
+
+**One engine per editor.** It holds the undo history for that editor's Blocks.
+Sharing one between two editors would let one undo the other's typing.
+
+## What a Block needs
+
+Declare a prop of kind `rich-text` and render it with `<RichText>`:
+
+```tsx
+schema: {
+  content: { kind: "rich-text", label: "Content", defaultValue: "" },
+},
+render: ({ props }) => <p><RichText value={props.content} /></p>,
+```
+
+On the canvas that becomes editable text. On the render path it becomes
+email-safe inline markup with the styles inlined. You write the Definition
+once; it never knows which side it is on.
+
+A Block has at most one rich-text prop.
+
+## Undo is one timeline
+
+Typing, dragging a Block, then pressing ⌘Z gives the **drag** back, not the
+last character.
+
+Text edits go onto the same history as everything else, as a marker the engine
+carries out. ⌘Z also works with nothing focused, and a text history the engine
+has since forgotten is stepped over rather than offered.
+
+You do not have to do anything to get this. It is what wiring both halves buys.
+
+## The formatting toolbar
+
+An ordinary slot. You draw it.
+
+```tsx
+function MyToolbar({ rect, formatting, commands }: TextToolbarProps) {
+  return (
+    <div style={{ position: "absolute", top: rect.top - 40, left: rect.left }}>
+      <button aria-pressed={formatting.bold} onClick={commands.toggleBold}>
+        Bold
+      </button>
+    </div>
+  );
+}
+```
+
+`rect` is already translated into the canvas's coordinate space, so there is no
+arithmetic to do. `formatting` says what the current selection carries;
+`commands` changes it. Both types live in
+[`lekh/canvas`](/reference/canvas/).
+
+## Everything this entry point exports
+
+Three names, and nothing else:
+
+`createTiptapTextEngine`, `TiptapTextEngine`, `TiptapTextEngineOptions`
+
+## Using something else
+
+Implement `TextEngine` and `EditableText` yourself and pass those instead.
+
+Nothing in the core knows Tiptap exists, so this is a supported path, not a
+fork. The types come from [`lekh`](/reference/lekh/).

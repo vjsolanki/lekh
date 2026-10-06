@@ -1,0 +1,16 @@
+---
+/** Words with code in them, as `describeBlocks` hands a table cell over. */
+import type { Inline } from "../lib/block-reference";
+
+interface Props {
+  readonly inline: Inline;
+}
+
+const { inline } = Astro.props;
+---
+
+{
+  inline.map((part) =>
+    typeof part === "string" ? part : <code>{part.code}</code>,
+  )
+}

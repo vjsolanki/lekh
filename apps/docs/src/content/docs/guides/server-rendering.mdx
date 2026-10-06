@@ -1,0 +1,204 @@
+---
+title: Render an email on a server
+description: "Turn a stored email into HTML you can send."
+---
+
+import { Code } from "@astrojs/starlight/components";
+import send from "../../../examples/server-send.ts?raw";
+
+## What you'll do
+
+Take a saved email out of your database and produce the HTML your email
+provider sends.
+
+## The short version
+
+Import `renderDocument` and `toHtml` from `lekh`. Your bundler tree-shakes the
+rest, so no editor reaches your server bundle.
+
+<Code code={send} lang="ts" title="server-send.ts" />
+
+Works in a route handler, a Server Component, a queue worker, a cron job or an
+edge function. It touches no `node:` builtins and no DOM.
+
+## Import from `lekh`, not `lekh/canvas`
+
+`lekh` carries no client-only directive and contains no canvas, no
+drag-and-drop and no Tiptap. Those live in `lekh/canvas` and `lekh/tiptap`.
+
+`lekh` has no side effects, so your bundler keeps only the names you import. A
+send job that imports `renderDocument` and `toHtml` ships the render path, not
+the editor.
+
+Everything needed to _write_ a Block Definition comes from `lekh` too:
+`defineBlock`, `RichText`, `classNames`, `MobileStyles` and `assetOf`. Your
+Blocks can live in a file that both your editor and your send job import.
+
+```ts
+// blocks.ts — imported by both sides
+import { defineBlock, RichText } from "lekh";
+```
+
+With no bundler, Node loads the whole `lekh` module. That still runs on a
+server, because `lekh` is pure.
+
+## Two steps, on purpose
+
+`renderDocument` gives you a React element. `toHtml` turns it into a string.
+
+They are separate so you can use a different stringifier. The library depends
+on no HTML formatter and no HTML-to-text converter.
+
+```ts
+const element = renderDocument(document, { definitions });
+const html = toHtml(element); // or your own
+```
+
+`toHtml` uses `renderToStaticMarkup`, so there are no hydration markers.
+
+## Build definitions once
+
+Call `createReactEmailPreset()` at module scope, not inside your handler.
+Rebuilding the array per request is pure waste, and if you also pass
+validators, it makes the checks run against a fresh registry every time.
+
+## It throws, on purpose
+
+| Error                     | When                                               |
+| ------------------------- | -------------------------------------------------- |
+| `UnknownBlockError`       | A Block type is not in your definitions.           |
+| `DocumentValidationError` | The email has at least one error-severity problem. |
+
+`UnknownBlockError` throws even with `validate: false`, because there is no way
+to draw the Block at all.
+
+A send job that stops is better than thousands of people receiving an email
+with a hole in it. Catch them, log the codes, and mark the send as failed.
+`trySend` above does exactly this.
+
+## Previewing versus sending
+
+```ts
+renderDocument(document, { definitions, validate: false });
+```
+
+Use `validate: false` for a preview of an email somebody is still working on.
+It is normal for a half-finished email to be invalid.
+
+Never use it on the path that actually sends. It is the one place the checks
+can be relied on.
+
+For a preview inside a page you already control, turn the doctype off too:
+
+```ts
+toHtml(element, { doctype: false });
+```
+
+## Keeping the checks the same on both sides
+
+If your editor runs extra validators, your send job must run the same ones, or
+the two will disagree about what is valid.
+
+The easy way is to let the editor hand them over:
+
+```ts
+renderDocument(editor.getDocument(), editor.getRenderOptions());
+```
+
+`getRenderOptions()` carries the definitions, validators and severity overrides
+together. Use it wherever an editor is in reach.
+
+Where one is not, such as a queue worker, export a single shared options object
+from one module and import it in both places.
+
+## Next.js
+
+The render path is safe in a Server Component:
+
+```tsx
+export default async function Preview({ id }: { id: string }) {
+  const document = await load(id);
+  return <div dangerouslySetInnerHTML={{ __html: emailToHtml(document) }} />;
+}
+```
+
+The canvas is not. Anything importing `lekh/canvas` needs `"use client"`.
+
+Keep Block Definitions in their own file that imports only from `lekh`. Then
+both sides can share them without dragging the canvas across the line.
+
+## In depth
+
+### What you get back, and what still has to be done
+
+`toHtml` returns a whole document: an XHTML 1.0 Transitional doctype followed
+by the markup your Definitions produced. It is `renderToStaticMarkup`
+underneath, so there are no hydration markers and nothing to strip.
+
+It is not, however, a finished send. Three things are yours.
+
+**A plain-text alternative.** Send both parts as a `multipart/alternative`
+message. Clients that cannot show HTML use it, some readers prefer it, and
+spam filters treat an HTML-only message worse than one with both. The library
+does not generate it — that would mean shipping an HTML-to-text converter and
+guessing what your Blocks mean.
+
+**The subject line.** It lives in your sending code, not in the Document. The
+Preset's root does carry `previewText`, which is the line some clients show
+next to the subject, and it renders hidden.
+
+**Absolute URLs everywhere.** Links and images both. Nothing resolves relative
+to anything by the time an email is opened.
+
+### Doing it once per send, not once per recipient
+
+`renderDocument` runs migrations and validation over the whole tree, and both
+cost real time on a large email. For a campaign, render once and reuse the
+string. Per-recipient personalisation belongs in whatever merge-tag syntax your
+ESP already has, applied to the rendered HTML.
+
+If you do render per recipient, build your Definitions array once at module
+scope. Rebuilding it inside the loop rebuilds every closure your Definitions
+captured.
+
+### Turning validation off is not a shortcut
+
+`validate: false` exists for previews, where a half-finished email is the
+normal state. On the send path it removes the only guarantee the library
+offers.
+
+The failure it prevents is asymmetric. A send job that throws wakes somebody
+up. An email without an unsubscribe link that went to fifty thousand people is
+a regulatory problem you cannot recall.
+
+Catch `DocumentValidationError`, report its `diagnostics`, and let the send
+fail.
+
+## Common problems
+
+**"document is not defined" on the server.** Something imported `lekh/canvas`.
+Check your Block Definitions import from `lekh`, not `lekh/canvas`.
+
+**The editor ends up in your server bundle.** Check your bundler tree-shakes
+for the server build. Then check nothing on that side imports `lekh/canvas`
+or `lekh/tiptap`.
+
+**The email renders but looks unstyled in Gmail.** Gmail strips stylesheets.
+Everything must be inline styles or the mobile stylesheet the root emits.
+
+**Images are the wrong size.** Your Assets carry the wrong width and height, or
+your Block does not emit both attributes.
+
+**It renders in preview and throws on send.** Preview passes
+`validate: false`. That is the checks doing their job.
+
+**The mobile stylesheet is missing.** Your root Definition does not render
+`<MobileStyles css={mobile.stylesheet()} />` in its head.
+
+## Why it works this way
+
+Rendering is the single exit from the library, so it is the only place a
+promise about the finished email can be kept. That is why it refuses instead of
+patching over a problem.
+
+Read [Forgiving editor, strict render](/why/forgiving-editor/).

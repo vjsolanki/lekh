@@ -1,0 +1,307 @@
+---
+title: Build your first editor
+description: "Go from an empty folder to a working email editor, one step at a time."
+---
+
+import { Code, Steps } from "@astrojs/starlight/components";
+import definitions from "../../examples/tutorial/definitions.ts?raw";
+import palette from "../../examples/tutorial/palette.tsx?raw";
+import inspector from "../../examples/tutorial/inspector.tsx?raw";
+import chrome from "../../examples/tutorial/chrome.tsx?raw";
+import images from "../../examples/tutorial/images.ts?raw";
+import app from "../../examples/tutorial/app.tsx?raw";
+import renderer from "../../examples/tutorial/render.ts?raw";
+import save from "../../examples/tutorial/save.ts?raw";
+
+By the end of this page someone can drag a section onto a canvas, type a
+headline into it, put a picture under it, restyle the lot, and get HTML you can
+send.
+
+Every file here is a real file that this site compiles.
+
+## What you write, and what you do not
+
+You write the panels. That is the deal, and it does not soften later.
+
+| You write                           | The library handles                         |
+| ----------------------------------- | ------------------------------------------- |
+| The palette, and how it is laid out | What is in it, and making entries draggable |
+| The inspector, and every control    | Which props exist, their values, undo       |
+| Buttons, menus, toolbars, chrome    | The commands behind them                    |
+| Everything drawn over the email     | Where each of those things goes             |
+| Where the Document is stored        | The Document, and moving it forward in time |
+
+The Blocks themselves you can go either way on. This page uses the Preset so
+there is something on the canvas by step 5. [Write your own
+Block](/guides/custom-blocks/) is the same tutorial with the Definitions
+written by hand, and the two mix freely.
+
+<Steps>
+
+1.  ### Install it
+
+    ```sh
+    npm install lekh @react-email/components @tiptap/core @tiptap/pm @tiptap/starter-kit
+    ```
+
+    One package and four optional peers. `@react-email/components` is what the
+    Preset's Blocks draw with. The three Tiptap packages are what lets someone
+    type on the canvas.
+
+    Both are replaceable and neither is in the core. Write your own Blocks and
+    react.email never loads; supply your own Text Engine and Tiptap never
+    loads. This tutorial takes both because they are the shortest route to an
+    editor that does something.
+
+    You also need `react` and `react-dom`, 18.3 or newer.
+
+2.  ### Choose your Blocks
+
+    A Block is one piece of an email: a section, a row of columns, an image. A
+    Block Definition is the registered description of one kind of Block — what
+    someone may change about it, how it draws, and what it may contain.
+
+    The Preset is nine of them, ready to compose.
+
+    <Code code={definitions} lang="ts" title="definitions.ts" />
+
+    `createReactEmailPreset` returns a plain array. That is the whole extension
+    model: spread it, filter it, or replace it entirely.
+
+    ```ts
+    const definitions = [...createReactEmailPreset(), myCallout];
+    ```
+
+    Read what is in it in [the `lekh/blocks`
+    reference](/reference/blocks/). If your users only need a few Blocks,
+    [`pickReactEmailPreset`](/reference/blocks/#pickreactemailpreset) ships
+    only those.
+
+3.  ### Create the editor
+
+    ```ts
+    import { createEditor } from "lekh";
+    import { definitions, rootType } from "./definitions";
+
+    const editor = createEditor({ definitions, rootType });
+    ```
+
+    The editor holds the email and is the only thing that changes it. Create it
+    **once** — step 9 shows how.
+
+    It starts with an empty email, seeded with any Required Blocks, so nobody
+    ever begins in an invalid state.
+
+4.  ### Re-render when things change
+
+    The editor does not hand you a new email on every keystroke. It tells you
+    something changed, and you read what you need.
+
+    `useEditorState` is that read. Say what you want, and the component
+    re-renders when that changes and not otherwise.
+
+    ```tsx
+    import { useEditorState } from "lekh/canvas";
+
+    const stage = useEditorState((editor) => editor.getStage());
+    ```
+
+    There is no effect to write and nothing to remember to call — reading is
+    subscribing. Select the narrowest thing a component needs, and it will hold
+    still through everything else: an undo button written this way does not
+    re-render while somebody types. [Subscribe to changes
+    efficiently](/guides/subscribing/) covers the rest.
+
+5.  ### Add a palette to drag from
+
+    `usePalette` gives you the list of Blocks this editor knows about.
+    `usePaletteDrag` makes one of them draggable. You draw the rest.
+
+    <Code code={palette} lang="tsx" title="palette.tsx" />
+
+    Spread `dragHandleProps` onto whatever element should start the drag. It
+    carries no styling and no drag-library types, so it fits a button you
+    already have.
+
+    The list arrives with Structural Blocks already removed. A column belongs
+    to the row that made it, so it is never something to drag in on its own.
+
+6.  ### Add an inspector to edit with
+
+    When someone selects a Block, the editor describes that Block's editable
+    props as plain data. It renders no form of its own. You turn each
+    description into a control from your own design system.
+
+    <Code code={inspector} lang="tsx" title="inspector.tsx" />
+
+    `control.set(...)` is the whole write path. It records an undoable change.
+
+    `control.value` is typed `unknown`, because your Blocks decide what a prop
+    holds. Narrow it rather than casting.
+
+    A `kind` you do not recognise returns `null`. That is what lets you add a
+    new kind of prop later without touching this switch first.
+
+    Two things worth noticing in there. A colour prop can hold `"none"`, which
+    is not a CSS colour — someone is choosing between a colour and nothing, so
+    the control offers both. And `rich-text` is deliberately not editable here,
+    because the Text Engine owns it and two write paths for one prop is a bug
+    waiting to happen.
+
+    With nothing selected, `getControls()` describes the root, which is where
+    whole-email settings like background colour and content width live.
+
+7.  ### Draw the chrome
+
+    The third panel you write, and the one that makes the other two legible.
+
+    A Slot is a component you supply and the canvas positions. It hands you a
+    rectangle in the canvas's own coordinates and the Block that rectangle
+    belongs to; you draw. That is the whole idea, and it is the same idea
+    thirteen times.
+
+    <Code code={chrome} lang="tsx" title="chrome.tsx" />
+
+    The library draws none of this. A Slot you leave out simply draws nothing,
+    which is worth knowing before you see it happen: an editor with no Slots at
+    all still drags, still selects and still types, and shows you none of it.
+
+    Four here, out of thirteen. `selection` and `hover` are the same component
+    twice, because a rectangle is a rectangle. `dropIndicator` is the one that
+    makes a drag legible — it is the line an Author aims at. `textToolbar` is
+    what the Tiptap packages in step 1 were for.
+
+    The Slot layer ignores pointer events, so an outline cannot swallow a click
+    meant for the email under it. Chrome that _is_ meant to be clicked says
+    `pointerEvents: "auto"` on itself, as the toolbar does.
+
+    :::note
+    The email renders in an iframe, and your stylesheet does not cross into it.
+    Slots are on your side of that boundary, which is why an ordinary
+    `<button>` here looks like the rest of your application. [The example's
+    chrome](/example/chrome/) fills eleven of the thirteen, at length.
+    :::
+
+8.  ### Let people add pictures
+
+    The library never uploads anything, and never invents a URL. When it needs
+    a picture it asks you, and waits.
+
+    <Code code={images} lang="ts" title="images.ts" />
+
+    Pass this to `createEditor` as `resolveImage` and dragging the Image Block
+    in starts asking rather than inserting. Nothing enters the email until an
+    Asset comes back, so an Author who changes their mind leaves no empty
+    picture frame behind, and a saved email never holds a URL that meant
+    something only on one machine.
+
+    Leave `resolveImage` out and the Image Block still drags in — it just
+    arrives empty with no way to fill it, which is a worse editor than one with
+    no Image Block at all.
+
+    An Asset is a URL **and** the picture's width and height. Not optional:
+    several mail clients render an image at its intrinsic size when the markup
+    does not say otherwise, so a picture with no dimensions lands differently
+    in different inboxes.
+
+    This one asks for a URL, which keeps step 10 honest — HTML you can send
+    needs a `src` that outlives the tab. Sending the Author's own files to your
+    storage is the same function with an upload in it: [Handle images and
+    uploads](/guides/images/).
+
+9.  ### Put it together
+
+    <Code code={app} lang="tsx" title="app.tsx" />
+
+    `EditorProvider` wraps both the palette and the canvas, because a drag
+    starts in one and ends in the other.
+
+    The Text Engine is one object in two halves. History goes to `createEditor`
+    as `textEngine`; the editable text goes to the provider as
+    `editableText`. Leave the second out and text is drawn but never typed into.
+
+    `useState(() => ...)` creates both once. Calling `createEditor` straight in
+    the body would throw the email away on every render.
+
+    The canvas needs a height. Give it one, and the email fills it. The Slots
+    go here too — the canvas positions them, so it is the thing that has to
+    know about them.
+
+    :::note
+    Using the Next.js App Router? Put `"use client"` at the top of this file.
+    The canvas runs in the browser. The render path in step 10 does not, so it
+    is safe in a Server Component.
+    :::
+
+    Run it. Drag a section in and watch the line show you where it will land.
+    Drop a heading into it, double-click, and type. Drag an image in and give
+    it a URL.
+
+10. ### Get HTML you can send
+
+    <Code code={renderer} lang="ts" title="render.ts" />
+
+    Rendering **throws** if the email has a real problem, such as a Block you
+    have no definition for or a failed check. A send job that stops is better
+    than thousands of people getting a broken email.
+
+    A preview is the other case. Somebody halfway through writing an email has
+    an invalid one by definition, so previews pass `validate: false`.
+
+11. ### Save it and open it again
+
+    An email is a plain JSON object. Store it in whatever you already use.
+
+    <Code code={save} lang="ts" title="save.ts" />
+
+    Pass it back as `document` and you carry on exactly where you left off.
+
+    For a large email, saving the whole thing on every change gets wasteful.
+    `editor.onOp` gives you one small patch per change instead. See
+    [Save and load a document](/guides/save-and-load/).
+
+</Steps>
+
+## What you have
+
+A working editor. Drag a Block in and a line shows where it lands. Click one
+and it is outlined, with the inspector describing it. Double-click and type,
+with a toolbar on the selection. Add a picture. Undo the lot with ⌘Z, and get
+sendable HTML at the end.
+
+More keyboard than the page has shown you, in fact. Backspace deletes the
+selected Block, ⌘D duplicates it, and ⌘⇧↑ and ⌘⇧↓ move it — the set an Author
+expects to work without being taught. [Change the
+keymap](/guides/keyboard-shortcuts/) if any of those belong to your application
+already.
+
+The chrome you drew is four Slots out of thirteen. The other nine are the same
+shape — a component, a rectangle. [Draw the chrome](/guides/chrome/) picks up
+the four that are on screen when nothing is happening, and says which guide
+covers each of the rest; [the example's chrome](/example/chrome/) is all of
+them in one file.
+
+What it does not have yet, roughly in the order you will want it: your
+product's look, the Author's own files going to your storage instead of a URL
+box, drops refused where they do not belong, and somebody being told what is
+wrong before they send. Those are the guides.
+
+## Where to go next
+
+The guides come in four sections, in the order you will want them, and each page
+links to the next.
+
+- **Build the editor.** The panels you draw around the canvas. Start with
+  [Build a palette](/guides/palette/), then
+  [Build an inspector](/guides/inspector/) and
+  [Draw the chrome](/guides/chrome/).
+- **Write your Blocks.** The same editor as this one, with Definitions you
+  wrote. Start with [Write your own Block](/guides/custom-blocks/).
+- **Keep emails valid.** The unsubscribe link, checks of your own, and showing
+  somebody what is wrong. Start with
+  [Add unsubscribe and a postal address](/guides/compliance/).
+- **Save and send.** Storing a Document and turning it into HTML on a server.
+  Start with [Save and load a document](/guides/save-and-load/).
+
+If you would rather understand the shape of it first, [Core
+ideas](/core-ideas/) is three ideas and about five minutes.

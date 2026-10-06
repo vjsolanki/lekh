@@ -1,0 +1,259 @@
+---
+title: Write your own checks
+description: "Validators, checks that travel with a Block, your own codes and your own one-click fixes."
+---
+
+import { Code } from "@astrojs/starlight/components";
+import validator from "../../../examples/custom-validator.ts?raw";
+import wiring from "../../../examples/custom-validator-wiring.ts?raw";
+import resolved from "../../../examples/resolved-prop.ts?raw";
+
+## What you'll do
+
+Check an email against a rule only your product knows about, and report it on
+the same channel every other problem uses.
+
+## The short version
+
+A Validator is a plain function. It takes a Document and returns Diagnostics.
+
+A Diagnostic is one finding about an email: a code, a message, a severity, and
+optionally the Block it concerns and a fix.
+
+<Code code={validator} lang="ts" title="house-style.ts" />
+
+Hand it to the editor, and to the render path:
+
+<Code code={wiring} lang="ts" title="editor.ts" />
+
+Nothing draws it. Render the list yourself — see [Show problems and offer
+fixes](/guides/diagnostics/).
+
+## Options
+
+A Validator's signature:
+
+```ts
+type Validator = (document, context) => readonly Diagnostic[];
+```
+
+What you return:
+
+| Field      | Type       | Default | What it does                                   |
+| ---------- | ---------- | ------- | ---------------------------------------------- |
+| `code`     | `string`   | —       | Stable id. Your panel matches on this.         |
+| `message`  | `string`   | —       | Fallback wording, for when you have none.      |
+| `severity` | `Severity` | —       | `"warning"` surfaces. `"error"` blocks a send. |
+| `blockId`  | `string`   | absent  | The Block it concerns, when it concerns one.   |
+| `prop`     | `string`   | absent  | The prop on that Block, when it is one prop.   |
+| `stage`    | `"mobile"` | absent  | Only when the mobile value alone is wrong.     |
+| `repair`   | `Repair`   | absent  | What would put it right, when anything would.  |
+
+What you are given:
+
+| Field                   | Type                         | What it is                                 |
+| ----------------------- | ---------------------------- | ------------------------------------------ |
+| `document.root`         | `Block`                      | The tree. Walk it yourself.                |
+| `context.getDefinition` | `(type) => Def \| undefined` | The Definition for a Block's type, if any. |
+| `context.definitions`   | `BlockDefinition[]`          | Everything the editor knows about.         |
+
+Where to put the check:
+
+| Where                     | Sees                 | Use it for               |
+| ------------------------- | -------------------- | ------------------------ |
+| A Definition's `validate` | One Block at a time. | A rule about that Block. |
+| A `Validator`             | The whole Document.  | A rule about the email.  |
+
+## In depth
+
+### Two places a check can live
+
+A check about one Block belongs **on that Block**. A Block Definition takes its
+own `validate`, and it travels with the Block wherever it is composed — into
+your editor, into somebody else's, into the render path.
+
+```ts
+validate: (block) =>
+  isBlank(block.props["href"])
+    ? [{ code: "button-no-link", message: "This button goes nowhere.", severity: "warning" as const, blockId: block.id }]
+    : [],
+```
+
+A check that needs to see more than one Block is a Validator. "Two calls to
+action in one email", "the header comes after the footer", "no link is repeated
+three times" — none of those can be judged from one Block.
+
+Both end up on the same list. `editor.getDiagnostics()` merges the built-in
+checks, every Definition's `validate`, and every Validator you supplied.
+
+### Reading a prop that nobody set
+
+`block.props` holds only what somebody actually set. A prop nobody touched is
+absent, and absent means the Schema default.
+
+So a check that reads the stored value alone reports every untouched Block as
+empty. Resolve against the Schema first:
+
+<Code code={resolved} lang="ts" title="resolved-prop.ts" />
+
+That is also why `isBlank` exists and is exported. It treats whitespace and
+non-strings as saying nothing, so `"   "` is not a label and `null` is not a
+link.
+
+### Say nothing about a Block you do not understand
+
+`context.getDefinition(block.type)` returns nothing for a Block no Definition
+claims — a type somebody removed, or one from a Preset this editor did not
+compose.
+
+Skip those. You cannot know what their props mean, and the Document already
+reports them itself, as `block-unregistered` at error severity.
+
+The same rule holds for a value you cannot read. The shipped contrast check
+says **nothing at all** when it cannot work out what is behind a piece of text.
+A check that guesses produces false warnings, people learn to ignore every
+warning, and the check has made things worse.
+
+Silence means "could not tell", not "fine".
+
+### Choosing a code
+
+Pick a stable string and export it. It is the thing you match on, so it must
+outlive any rewording of the message.
+
+```ts
+export const INSECURE_LINK = "insecure-link";
+```
+
+Namespace it if your Blocks are published for other people to compose:
+`acme/insecure-link`. Codes share one space, and the severity map is keyed by
+them.
+
+The `message` is a fallback, not a product string. It is there so you are never
+stuck with a blank row, not so you ship it. Word the finding yourself, keyed on
+the code, and you get translation and tone for free.
+
+### Choosing a severity
+
+**A warning** surfaces and nothing more.
+
+**An error** stops `renderDocument`. The email cannot be sent while it stands.
+
+Default to a warning. Reach for an error only when the finding is a fact rather
+than a judgement, and when somebody can actually get out of it. A rule people
+cannot satisfy is a rule that teaches them to turn validation off.
+
+Anybody composing your check can raise it later:
+
+```ts
+createEditor({
+  definitions,
+  validators: [houseStyle],
+  severities: { "insecure-link": "error" },
+});
+```
+
+Severity only goes **up**. An error can never be softened into a warning, or
+the render path's refusal would have a back door. If you do not want a rule, do
+not switch it on.
+
+### Attaching a fix
+
+A Repair is **data describing** a change, not the change itself. Your Validator
+runs on the render path too, and the render path has no editor to change
+anything with.
+
+Two kinds the library knows how to carry out. `set-prop` is an `Edit`, the
+same shape a Suggestion uses, so an Agent shown your Diagnostic can suggest its
+fix as it stands:
+
+```ts
+type KnownRepair =
+  | {
+      kind: "set-prop";
+      blockId: string;
+      prop: string;
+      value: unknown;
+      stage?: Stage;
+    }
+  | { kind: "restore-required-block"; type: string };
+```
+
+`stage` is `"desktop"` or `"mobile"`. Leave it out to write on the Stage the
+editor is showing.
+
+`value: undefined` unsets the prop, which resolves it back to the Schema
+default. That is usually what you want — writing the default value in as a
+stored one looks the same until somebody changes the Definition.
+
+`editor.applyRepair(repair)` is the only thing that performs one, and it is one
+undoable step. Somebody who clicks "Fix it" and changes their mind presses ⌘Z
+once.
+
+Your own kinds are allowed:
+
+```ts
+type ReplacePlaceholder = { kind: "replace-placeholder"; blockId: string };
+```
+
+The library returns `false` from `applyRepair` for anything it does not
+recognise. Handle your kinds in your own click handler first, and fall back to
+`applyRepair` for the rest.
+
+Leave `repair` off when nothing could put the finding right. Nothing knows what
+your placeholder text was meant to say.
+
+### The same checks run at send time
+
+`renderDocument` runs every Validator it is given, and throws
+`DocumentValidationError` on any error-severity finding.
+
+That is only true if you give it the same ones. `editor.getRenderOptions()`
+carries the Definitions, the Validators and the severity map together, so pass
+that rather than rebuilding the list:
+
+```ts
+renderDocument(editor.getDocument(), editor.getRenderOptions());
+```
+
+A Validator therefore has to run without a DOM and without an editor. Keep it a
+pure function of the Document. Do not reach for `window`, and do not fetch
+anything.
+
+### Cost
+
+`getDiagnostics()` is cached and recomputed when the Document changes, which
+during a drag is often. Your Validator walks the tree on every one of those.
+
+A single pass with early exits is fine at the size an email is. A per-Block
+network call is not.
+
+## Common problems
+
+**Every Block reports as empty.** You read `block.props["x"]` directly. An
+unset prop is absent, not the default.
+
+**Your check never runs.** It is not in the `validators` array, or you built the
+render options by hand and left it out.
+
+**Your findings never show up.** Nothing draws them. The library renders no UI.
+
+**Sending throws but your panel is empty.** Your panel filters to warnings, or
+`renderDocument` was given a different Validator list than the editor.
+
+**"Fix it" does nothing.** `applyRepair` returned `false`, because the repair
+kind is one you invented. Handle it yourself.
+
+**A warning you promoted is still a warning.** The `severities` key must match
+the code exactly. It is a plain string compare.
+
+**You cannot soften an error to a warning.** By design. Remove the check
+instead.
+
+## Why it works this way
+
+Editing forgives and sending does not, so a check has to run on both sides of
+that line — and only one of those sides has an editor. That is why a Validator
+is a pure function and a Repair is data.
+
+Read [Forgiving editor, strict render](/why/forgiving-editor/).
